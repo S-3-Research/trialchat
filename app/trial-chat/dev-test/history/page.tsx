@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import DevGate from "@/components/DevGate";
+import { devAuthHeaders } from "@/lib/devAuth";
 import {
   FlaskConical,
   History,
@@ -123,7 +125,7 @@ function StatusIcon({ status }: { status: ResultItem["status"] }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────
 
-export default function DevTestHistoryPage() {
+function DevTestHistoryPageInner() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,7 +143,9 @@ export default function DevTestHistoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/dev-test-history");
+      const res = await fetch("/api/dev-test-history", {
+        headers: devAuthHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch");
       setRuns(data.runs || []);
@@ -160,7 +164,9 @@ export default function DevTestHistoryPage() {
   const openDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/dev-test-history?id=${encodeURIComponent(id)}`);
+      const res = await fetch(`/api/dev-test-history?id=${encodeURIComponent(id)}`, {
+        headers: devAuthHeaders(),
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load");
       setSelectedRun(data.run as RunDetail);
@@ -181,7 +187,7 @@ export default function DevTestHistoryPage() {
       try {
         const res = await fetch(
           `/api/dev-test-history?id=${encodeURIComponent(id)}`,
-          { method: "DELETE" }
+          { method: "DELETE", headers: devAuthHeaders() }
         );
         if (!res.ok) throw new Error("Delete failed");
         setRuns((prev) => prev.filter((r) => r.id !== id));
@@ -584,5 +590,13 @@ export default function DevTestHistoryPage() {
         Stored in Supabase · Showing newest first
       </div>
     </div>
+  );
+}
+
+export default function DevTestHistoryPage() {
+  return (
+    <DevGate>
+      <DevTestHistoryPageInner />
+    </DevGate>
   );
 }

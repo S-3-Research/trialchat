@@ -17,6 +17,12 @@ function dateKey(iso: string): string {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const providedPassword = request.headers.get("x-admin-password");
+  if (!adminPassword || providedPassword !== adminPassword) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const days = Math.min(Math.max(parseInt(searchParams.get("days") ?? "30", 10), 1), 90);
   const excludeTest = searchParams.get("exclude_test") !== "false";
@@ -25,7 +31,7 @@ export async function GET(request: Request): Promise<Response> {
   since.setDate(since.getDate() - days);
 
   let query = supabase
-    .from("link_events")
+    .from("trialchat_link_events")
     .select("id, url, url_type, meta, is_test, created_at")
     .gte("created_at", since.toISOString())
     .order("created_at", { ascending: false });

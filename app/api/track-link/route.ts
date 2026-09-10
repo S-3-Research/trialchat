@@ -26,7 +26,7 @@ export async function POST(request: Request): Promise<Response> {
   const isTest = metaObj.is_test === true;
 
   const { error } = await supabase
-    .from("link_events")
+    .from("trialchat_link_events")
     .insert({ url, url_type, meta: metaObj, is_test: isTest });
 
   if (error) {

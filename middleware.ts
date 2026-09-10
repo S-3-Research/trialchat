@@ -1,8 +1,9 @@
-import { clerkMiddleware } from '@clerk/nextjs/server'
+import { NextResponse } from 'next/server'
 
-// All routes are public — guests are let through without signing in.
-// clerkMiddleware() must be present so that auth() works inside API routes.
-export default clerkMiddleware()
+// All routes are public — no authentication middleware is required.
+export default function middleware() {
+  return NextResponse.next()
+}
 
 export const config = {
   matcher: [

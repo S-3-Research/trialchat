@@ -1,5 +1,4 @@
 import { WORKFLOW_ID } from "@/lib/config";
-import { auth } from "@clerk/nextjs/server";
 
 import { fetch as undiciFetch, ProxyAgent } from "undici";
 
@@ -28,7 +27,8 @@ export async function POST(request: Request): Promise<Response> {
     if (!openaiApiKey)
       return new Response("Missing OpenAI API Key", { status: 500 });
 
-    const { userId } = await auth();
+    // Sign-in is not supported; all requests are treated as guests.
+    const userId: string | null = null;
     const parsedBody = await request.json();
     
     // Guest users: use stable ID from request body to preserve chat history

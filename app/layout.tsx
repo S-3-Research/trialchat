@@ -1,5 +1,4 @@
 import Script from "next/script";
-import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from "next";
 import "./globals.css";
 import { FontSizeProvider } from "@/contexts/FontSizeContext";
@@ -17,15 +16,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const clerkPublishableKey =
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-    "pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk";
-
   return (
-    <ClerkProvider
-      publishableKey={clerkPublishableKey}
-      afterSignOutUrl="/"
-    >
       <html lang="en" className="text-base">
         <head>
           <ThemeScript />
@@ -48,7 +39,6 @@ export default function RootLayout({
           </ColorSchemeProvider>
         </body>
       </html>
-    </ClerkProvider>
 
   );
 }

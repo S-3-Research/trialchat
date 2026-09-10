@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
 import { ChatKitPanel, type FactAction } from "@/components/ChatKitPanel";
 import { useColorScheme } from "@/contexts/ColorSchemeContext";
 import ResourcePanel from "@/components/ResourcePanel";
@@ -17,7 +16,9 @@ interface AppProps {
 export default function App({ skipIntake = false, autoOpenMatch = false }: AppProps) {
   const { scheme, setScheme } = useColorScheme();
   const [isResourcePanelOpen, setIsResourcePanelOpen] = useState(false);
-  const { isLoaded, isSignedIn } = useUser();
+  // Sign-in is not supported; all users are treated as guests.
+  const isLoaded = true;
+  const isSignedIn = false;
   const [showIntakeModal, setShowIntakeModal] = useState(false);
   const [intakeCompleted, setIntakeCompleted] = useState(false);
   const [isMigratingIntake, setIsMigratingIntake] = useState(false);

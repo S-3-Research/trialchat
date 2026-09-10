@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 
 const SESSION_KEY = "admin_authed";
+const PASSWORD_KEY = "admin_password";
 
-function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
+function AdminLogin({ onSuccess }: { onSuccess: (password: string) => void }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +29,8 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
       const data = await res.json();
       if (data.success) {
         sessionStorage.setItem(SESSION_KEY, "1");
-        onSuccess();
+        sessionStorage.setItem(PASSWORD_KEY, password);
+        onSuccess(password);
       } else {
         setError(data.error ?? "Incorrect password");
         setPassword("");
@@ -155,7 +157,7 @@ function daysAgoISODate(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function DownloadModal({ onClose }: { onClose: () => void }) {
+function DownloadModal({ password, onClose }: { password: string; onClose: () => void }) {
   const [from, setFrom] = useState(daysAgoISODate(30));
   const [to, setTo] = useState(todayISODate());
   const [excludeTest, setExcludeTest] = useState(false);
@@ -182,7 +184,9 @@ function DownloadModal({ onClose }: { onClose: () => void }) {
         to: toISO,
         exclude_test: excludeTest ? "true" : "false",
       });
-      const res = await fetch(`/api/link-events/export?${params.toString()}`);
+      const res = await fetch(`/api/link-events/export?${params.toString()}`, {
+        headers: { "x-admin-password": password },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error ?? `HTTP ${res.status}`);
@@ -274,9 +278,13 @@ function DownloadModal({ onClose }: { onClose: () => void }) {
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [password, setPassword] = useState("");
 
   useEffect(() => {
-    setAuthed(sessionStorage.getItem(SESSION_KEY) === "1");
+    const storedAuthed = sessionStorage.getItem(SESSION_KEY) === "1";
+    const storedPassword = sessionStorage.getItem(PASSWORD_KEY) ?? "";
+    setAuthed(storedAuthed && !!storedPassword);
+    setPassword(storedPassword);
     setAuthChecked(true);
   }, []);
 
@@ -291,7 +299,9 @@ export default function AdminPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/link-events?days=${days}&exclude_test=${includeTest ? "false" : "true"}`);
+      const res = await fetch(`/api/link-events?days=${days}&exclude_test=${includeTest ? "false" : "true"}`, {
+        headers: { "x-admin-password": password },
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setData(await res.json() as StatsData);
     } catch (e) {
@@ -299,7 +309,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [days, includeTest]);
+  }, [days, includeTest, password]);
 
   useEffect(() => {
     if (authed) fetchData();
@@ -309,7 +319,7 @@ export default function AdminPage() {
   if (!authChecked) return null;
 
   // Show login if not authenticated
-  if (!authed) return <AdminLogin onSuccess={() => setAuthed(true)} />;
+  if (!authed) return <AdminLogin onSuccess={(pwd) => { setPassword(pwd); setAuthed(true); }} />;
 
   const maxDaily = data ? Math.max(...data.daily.map((d) => d.count), 1) : 1;
   const dailyTickValues = Array.from(
@@ -611,7 +621,7 @@ export default function AdminPage() {
         )}
       </div>
 
-      {showDownloadModal && <DownloadModal onClose={() => setShowDownloadModal(false)} />}
+      {showDownloadModal && <DownloadModal password={password} onClose={() => setShowDownloadModal(false)} />}
     </div>
   );
 }

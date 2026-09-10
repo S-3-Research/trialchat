@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useUser, SignInButton } from "@clerk/nextjs";
 
 interface UserProfile {
   id?: string;
@@ -27,7 +26,9 @@ interface UserProfile {
 }
 
 export default function PersonalizationPage() {
-  const { user, isLoaded } = useUser();
+  // Sign-in is not supported; all users are treated as guests.
+  const isLoaded = true;
+  const user = null as { fullName?: string | null; emailAddresses?: { emailAddress: string }[] } | null;
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -185,11 +186,13 @@ export default function PersonalizationPage() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Sign in Required</h2>
                 <p className="text-slate-600 dark:text-slate-400 mb-8 leading-relaxed">Please sign in to manage your personal information and preferences.</p>
-                <SignInButton mode="modal">
-                    <button className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all shadow-lg shadow-blue-600/20">
-                        Sign In
-                    </button>
-                </SignInButton>
+                <button
+                    disabled
+                    className="w-full py-3 rounded-xl bg-blue-600/50 text-white font-semibold cursor-not-allowed shadow-lg shadow-blue-600/10"
+                    title="Sign-in is temporarily disabled"
+                >
+                    Sign-in coming soon
+                </button>
              </div>
         </div>
     );

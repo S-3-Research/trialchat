@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { auth } from "@clerk/nextjs/server";
 import type { UserProfile, UserTrialInterest } from "@/lib/types/supabase";
 
 export const runtime = "edge";
 
 // Initialize Supabase client
+// 此 client 仅在 server 端使用，使用 secret key 绕过 RLS（非 NEXT_PUBLIC_ 前缀）
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+const supabaseKey = process.env.SUPABASE_SECRET_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(request: NextRequest) {
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 async function handleGetUserProfile(params: Record<string, unknown>) {
   // 获取当前登录用户
   console.log("Fetching user profile with params:", params);
-  const { userId: currentUserId } = await auth();
+  const currentUserId: string | null = null;
   if (!currentUserId) {
     return NextResponse.json(
       { success: false, error: "Not authenticated" },
@@ -133,7 +133,7 @@ async function handleGetUserProfile(params: Record<string, unknown>) {
  */
 async function handleSaveUserProfile(params: Record<string, unknown>) {
   // 获取当前登录用户
-  const { userId: currentUserId } = await auth();
+  const currentUserId: string | null = null;
   
   if (!currentUserId) {
     return NextResponse.json(
@@ -210,7 +210,7 @@ async function handleSaveUserProfile(params: Record<string, unknown>) {
  */
 async function handleGetTrialInterests(params: Record<string, unknown>) {
   // 获取当前登录用户
-  const { userId: currentUserId } = await auth();
+  const currentUserId: string | null = null;
   
   if (!currentUserId) {
     return NextResponse.json(
@@ -266,7 +266,7 @@ async function handleGetTrialInterests(params: Record<string, unknown>) {
  */
 async function handleSaveTrialInterest(params: Record<string, unknown>) {
   // 获取当前登录用户
-  const { userId: currentUserId } = await auth();
+  const currentUserId: string | null = null;
   
   if (!currentUserId) {
     return NextResponse.json(

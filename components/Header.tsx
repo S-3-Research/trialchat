@@ -2,12 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  SignInButton,
-  SignedIn,
-  SignedOut,
-  UserButton,
-} from "@clerk/nextjs";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useColorScheme } from "@/contexts/ColorSchemeContext";
 import { useFontSize } from "@/contexts/FontSizeContext";
@@ -293,36 +287,15 @@ export default function Header() {
         <div className="relative">
             <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 p-[2px]">
                 <div className="w-full h-full rounded-full bg-slate-100 dark:bg-slate-900 overflow-hidden flex items-center justify-center">
-                    <SignedOut>
-                        {SIGN_IN_ENABLED ? (
-                            <SignInButton mode="modal">
-                                <button className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors">
-                                    IN
-                                </button>
-                            </SignInButton>
-                        ) : (
-                            <button
-                                onClick={() => {
-                                    setShowSignInNotice(true);
-                                    setTimeout(() => setShowSignInNotice(false), 3000);
-                                }}
-                                className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
-                            >
-                                IN
-                            </button>
-                        )}
-                    </SignedOut>
-                    <SignedIn>
-                        <UserButton
-                            afterSignOutUrl="/"
-                            appearance={{
-                                elements: {
-                                    avatarBox: "w-full h-full",
-                                    userButtonTrigger: "w-full h-full rounded-full focus:shadow-none focus:outline-none opacity-100"
-                                }
-                            }}
-                        />
-                    </SignedIn>
+                    <button
+                        onClick={() => {
+                            setShowSignInNotice(true);
+                            setTimeout(() => setShowSignInNotice(false), 3000);
+                        }}
+                        className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+                    >
+                        IN
+                    </button>
                 </div>
             </div>
             {showSignInNotice && (

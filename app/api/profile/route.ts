@@ -1,11 +1,12 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 // GET - 获取用户 profile
+// Note: Clerk auth has been removed; this route requires a real auth
+// mechanism to function and currently always responds as unauthenticated.
 export async function GET() {
   try {
-    const { userId } = await auth();
+    const userId: string | null = null;
     
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,7 +37,7 @@ export async function GET() {
 // POST/PUT - 更新或创建用户 profile
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth();
+    const userId: string | null = null;
     
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -97,7 +98,7 @@ export async function POST(request: Request) {
 // DELETE - 删除用户 profile
 export async function DELETE() {
   try {
-    const { userId } = await auth();
+    const userId: string | null = null;
     
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

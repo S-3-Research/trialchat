@@ -95,6 +95,42 @@ CREATE TABLE IF NOT EXISTS user_qa_log (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 5. Dev Test Runs 表 (Dev Test Runs)
+-- 记录 /trial-chat/dev-test 页面的历史测试运行结果
+CREATE TABLE IF NOT EXISTS dev_test_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Run metadata
+  dataset_name TEXT NOT NULL,
+  dataset_id   TEXT NOT NULL,
+  workflow_id  TEXT NOT NULL,
+  workflow_name TEXT,          -- matched from WORKFLOW_PRESETS if available
+
+  -- Aggregate stats
+  total_tests        INTEGER NOT NULL DEFAULT 0,
+  passed_tests       INTEGER NOT NULL DEFAULT 0,
+  failed_tests       INTEGER NOT NULL DEFAULT 0,
+  avg_rating         FLOAT,   -- null when no ratings given
+  hallucination_count INTEGER NOT NULL DEFAULT 0,
+  widget_count       INTEGER NOT NULL DEFAULT 0,
+
+  -- Full results payload (conversations + per-case meta)
+  results JSONB NOT NULL DEFAULT '[]'::jsonb,
+
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. 外部链接点击追踪表 (Link Events)
+-- 记录所有经过 /r 中转的外部链接点击（http/tel/mailto/sms）
+CREATE TABLE IF NOT EXISTS link_events (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  url        TEXT        NOT NULL,
+  url_type   TEXT        NOT NULL CHECK (url_type IN ('http', 'tel', 'mailto', 'sms')),
+  meta       JSONB       NOT NULL DEFAULT '{}',
+  is_test    BOOLEAN     NOT NULL DEFAULT FALSE,  -- ?test=true 触发的测试流量标记，便于分析时过滤
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- =====================================================
 -- 索引 (Indexes)
 -- =====================================================
@@ -105,6 +141,12 @@ CREATE INDEX IF NOT EXISTS idx_conversation_session ON conversation_history(sess
 CREATE INDEX IF NOT EXISTS idx_trial_interests_clerk_id ON user_trial_interests(clerk_user_id);
 CREATE INDEX IF NOT EXISTS idx_trial_interests_trial ON user_trial_interests(trial_id);
 CREATE INDEX IF NOT EXISTS idx_qa_log_clerk_id ON user_qa_log(clerk_user_id);
+CREATE INDEX IF NOT EXISTS idx_dev_test_runs_created_at ON dev_test_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_link_events_created_at ON link_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_link_events_url ON link_events(url);
+CREATE INDEX IF NOT EXISTS idx_link_events_url_type ON link_events(url_type);
+CREATE INDEX IF NOT EXISTS idx_link_events_meta ON link_events USING GIN (meta);
+CREATE INDEX IF NOT EXISTS idx_link_events_is_test ON link_events(is_test);
 
 -- =====================================================
 -- Row Level Security (RLS)
@@ -115,6 +157,8 @@ ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversation_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_trial_interests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_qa_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dev_test_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE link_events ENABLE ROW LEVEL SECURITY;
 
 -- 策略：用户只能访问自己的数据
 -- 注意：clerk_user_id 必须匹配当前请求的用户ID
@@ -144,8 +188,25 @@ CREATE POLICY "Users can manage own trial interests" ON user_trial_interests
 CREATE POLICY "Users can manage own Q&A" ON user_qa_log
   FOR ALL USING (true);
 
--- 注意：所有策略都设为 true，因为实际的访问控制在 API 层通过 Clerk 完成
--- Supabase 使用匿名密钥，无法直接验证 Clerk 用户
+-- dev_test_runs: 内部调试工具数据，允许读/写/删（无最终用户访问）
+CREATE POLICY "Allow read dev_test_runs" ON dev_test_runs
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow insert dev_test_runs" ON dev_test_runs
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow delete dev_test_runs" ON dev_test_runs
+  FOR DELETE USING (true);
+
+-- link_events: 匿名/访客也需要能够写入点击追踪事件
+CREATE POLICY "Anyone can insert link events" ON link_events
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anyone can read link events" ON link_events
+  FOR SELECT USING (true);
+
+-- 注意：所有策略都设为 true —— 认证已从本项目移除（原 Clerk 认证已下线），
+-- 目前仅依赖 Supabase RLS 作为唯一保护层，尚未做细粒度的用户级别隔离。
 
 -- =====================================================
 -- 触发器：自动更新 updated_at

@@ -9,6 +9,12 @@ export const runtime = "nodejs";
 //   to              ISO date/datetime (inclusive) — required
 //   exclude_test    "true" | "false" (default "false" — export includes test data by default)
 export async function GET(request: Request): Promise<Response> {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const providedPassword = request.headers.get("x-admin-password");
+  if (!adminPassword || providedPassword !== adminPassword) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
@@ -34,7 +40,7 @@ export async function GET(request: Request): Promise<Response> {
 
   while (true) {
     let query = supabase
-      .from("link_events")
+      .from("trialchat_link_events")
       .select("*")
       .gte("created_at", from.toISOString())
       .lte("created_at", to.toISOString())

@@ -9,7 +9,19 @@
 
 import { supabase } from "@/lib/supabase";
 
+function checkDevAuth(request: Request): Response | null {
+  const devPassword = process.env.DEV_PASSWORD;
+  const provided = request.headers.get("x-dev-password");
+  if (!devPassword || provided !== devPassword) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return null;
+}
+
 export async function GET(request: Request): Promise<Response> {
+  const authError = checkDevAuth(request);
+  if (authError) return authError;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
 
@@ -43,6 +55,9 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const authError = checkDevAuth(request);
+  if (authError) return authError;
+
   try {
     const body = await request.json();
 
@@ -65,6 +80,9 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function DELETE(request: Request): Promise<Response> {
+  const authError = checkDevAuth(request);
+  if (authError) return authError;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) {

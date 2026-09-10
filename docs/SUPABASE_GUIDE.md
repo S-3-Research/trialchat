@@ -2,18 +2,16 @@
 
 ## 🔒 安全说明
 
-本系统采用**双层安全保护**：
+⚠️ **认证现状：Clerk 认证已从本项目移除**，`/api/tools` 当前不做用户身份校验，
+所有请求都会以未登录状态处理。
 
-1. **API 层验证（Clerk 认证）**
-   - 所有 `/api/tools` 请求都需要 Clerk 登录
-   - 验证 `clerk_user_id` 必须匹配当前登录用户
-   - 防止用户访问他人数据
-
-2. **数据库层保护（Supabase RLS）**
-   - Row Level Security 已启用
-   - 作为额外的安全层
-
-**重要：** 用户只能访问和修改自己的数据。任何尝试访问他人数据的请求都会被拒绝（403 Forbidden）。
+**Key 使用方式：** 所有数据库访问都发生在服务器端（API routes），因此统一使用
+`SUPABASE_SECRET_KEY`（server-only，不加 `NEXT_PUBLIC_` 前缀），该 key 会**绕过 RLS**。
+这意味着 RLS 策略是否开放已不再是实际的访问控制手段——真正的访问控制完全依赖
+API 路由代码本身（如 `/api/link-events` 系列接口通过 `x-admin-password` header
+校验 `ADMIN_PASSWORD`）。如需恢复按用户隔离数据的能力，需要重新接入一套身份认证
+方案，并在对应 API 路由里做用户身份校验（而不是依赖 RLS，因为 secret key 不受
+RLS 限制）。
 
 ## 一、在 Supabase 创建数据库表
 
@@ -24,9 +22,22 @@
 2. **执行 SQL**
    - 点击左侧菜单 "SQL Editor"
    - 点击 "New Query"
-   - 复制 `supabase-schema.sql` 的全部内容
+   - 每张表对应一个独立的 SQL 文件（见下表），按需复制对应文件内容执行；
+     新建项目建议按顺序全部执行一遍
    - 粘贴到编辑器中
    - 点击 "Run" 执行
+
+   | 文件 | 对应表 |
+   |---|---|
+   | `supabase-user-profiles.sql` | `user_profiles` |
+   | `supabase-conversation-history.sql` | `conversation_history` |
+   | `supabase-user-trial-interests.sql` | `user_trial_interests` |
+   | `supabase-user-qa-log.sql` | `user_qa_log` |
+   | `supabase-dev-test-runs.sql` | `dev_test_runs` |
+   | `supabase-trialchat-link-events.sql` | `trialchat_link_events` |
+
+   > 历史上这些表的 CREATE / ALTER 语句分散在多个迁移文件中，现已按表合并，
+   > 旧文件已移动到 `docs/archive/` 保留存档，无需再单独执行。
 
 3. **验证表创建**
    - 点击左侧 "Table Editor"
@@ -442,6 +453,6 @@ await fetch('/api/tools', {
 
 确保在 Vercel 环境变量中已设置：
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SECRET_KEY` — server-only（不加 `NEXT_PUBLIC_` 前缀），仅在 API routes 中使用，会绕过 RLS，切勿暴露到客户端代码或日志中
 
 这些变量已在您的 `.env.local` 中配置。

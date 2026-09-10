@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
 import { supabase } from '@/lib/supabase';
 
+// Note: Clerk auth has been removed; this route requires a real auth
+// mechanism to function and currently always responds as unauthenticated.
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth();
+    const userId: string | null = null;
     
     console.log('[migrate-intake] Starting migration, userId:', userId);
     

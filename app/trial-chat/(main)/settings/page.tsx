@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { IntakeFormEdit } from "@/components/IntakeFormEdit";
 import type { IntakeData } from "@/lib/types/intake";
 import { INTAKE_STORAGE_KEY } from "@/lib/types/intake";
 
 export default function SettingsPage() {
-  const { isLoaded, isSignedIn } = useUser();
+  // Sign-in is not supported; all users are treated as guests.
+  const isLoaded = true;
+  const isSignedIn = false;
   const router = useRouter();
   const [intakeData, setIntakeData] = useState<IntakeData | null>(null);
   const [isLoading, setIsLoading] = useState(true);

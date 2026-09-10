@@ -32,6 +32,8 @@ import {
   RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
+import DevGate from "@/components/DevGate";
+import { devAuthHeaders } from "@/lib/devAuth";
 import {
   WORKFLOW_ID,
   CREATE_SESSION_ENDPOINT,
@@ -41,6 +43,7 @@ import {
   getGreetingForUser,
 } from "@/lib/config";
 import { IntakeData } from "@/lib/types/intake";
+import { resolvePrompts } from "@/lib/types/prompts";
 import { useColorScheme } from "@/contexts/ColorSchemeContext";
 import { useFontSize } from "@/contexts/FontSizeContext";
 
@@ -280,7 +283,7 @@ const TestSession = React.memo(function TestSession({
     theme: { colorScheme, ...getThemeConfig(colorScheme, baseFontSize) },
     startScreen: {
       greeting: getGreetingForUser(intakeData),
-      prompts: getStarterPromptsForUser(intakeData),
+      prompts: resolvePrompts(getStarterPromptsForUser(intakeData), false),
     },
     composer: {
       placeholder: PLACEHOLDER_INPUT,
@@ -434,7 +437,7 @@ function StarRating({
 
 // ── Main Dev Test Page ─────────────────────────────────────────────────
 
-export default function DevTestPage() {
+function DevTestPageInner() {
   const { scheme } = useColorScheme();
   const { fontSize } = useFontSize();
   const baseFontSize = fontSize === "small" ? 14 : fontSize === "large" ? 18 : 16;
@@ -903,7 +906,7 @@ export default function DevTestPage() {
     try {
       const res = await fetch("/api/dev-test-history", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: devAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(payload),
       });
       const data = await res.json();
@@ -1765,5 +1768,13 @@ export default function DevTestPage() {
         </span>
       </div>
     </div>
+  );
+}
+
+export default function DevTestPage() {
+  return (
+    <DevGate>
+      <DevTestPageInner />
+    </DevGate>
   );
 }

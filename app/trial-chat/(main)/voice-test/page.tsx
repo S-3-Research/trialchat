@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { VoiceInputButtonWhisper } from "@/components/VoiceInputButtonWhisper";
+import DevGate from "@/components/DevGate";
 
-export default function VoiceTestPage() {
+function VoiceTestPageInner() {
   const [webSpeechTranscript, setWebSpeechTranscript] = useState("");
   const [whisperTranscript, setWhisperTranscript] = useState("");
   const [isSecureContext, setIsSecureContext] = useState(false);
@@ -202,5 +203,13 @@ export default function VoiceTestPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VoiceTestPage() {
+  return (
+    <DevGate>
+      <VoiceTestPageInner />
+    </DevGate>
   );
 }

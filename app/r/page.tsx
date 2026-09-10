@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { GUEST_ID_KEY, TEST_MODE_KEY } from "@/lib/guestId";
 
@@ -74,7 +73,9 @@ function RedirectContent() {
   const params = useSearchParams();
   const to = params.get("to") ?? "";
   const metaRaw = params.get("meta") ?? "{}";
-  const { isLoaded, user } = useUser();
+  // Sign-in is not supported; all users are treated as guests.
+  const isLoaded = true;
+  const user = null as { id: string } | null;
 
   const urlType = to ? getUrlType(to) : null;
   const copy = urlType ? TYPE_COPY[urlType] : TYPE_COPY.http;

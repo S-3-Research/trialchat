@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatKit, useChatKit } from "@openai/chatkit-react";
-import { useUser } from "@clerk/nextjs";
 import {
   PLACEHOLDER_INPUT,
   CREATE_SESSION_ENDPOINT,
@@ -87,7 +86,8 @@ export function ChatKitPanel({
   onOpenResourcePanel,
   autoOpenMatch = false,
 }: ChatKitPanelProps) {
-  const { isSignedIn } = useUser();
+  // Sign-in is not supported; all users are treated as guests.
+  const isSignedIn = false;
   const { fontSize } = useFontSize();
   const processedFacts = useRef(new Set<string>());
   const [errors, setErrors] = useState<ErrorState>(() => createInitialErrors());
