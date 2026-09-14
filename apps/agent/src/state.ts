@@ -1,18 +1,16 @@
-import { Annotation, messagesStateReducer } from "@langchain/langgraph";
-import type { BaseMessage } from "@langchain/core/messages";
+import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 
 /**
  * Shared graph state for the Trial Chat agent.
  *
- * `messages` follows the standard LangGraph "messages" convention so the
- * graph is compatible with LangGraph Studio, the LangGraph SDK, and
- * standard chat-style clients out of the box.
+ * Spreads the prebuilt `MessagesAnnotation` for the `messages` key so the
+ * generated JSON schema properly reflects the full Human/AI/System/Tool
+ * message union — required for LangGraph Studio's chat view to recognize
+ * this as a standard chat-compatible graph (a hand-rolled
+ * `Annotation<BaseMessage[]>` loses that union in the generated schema).
  */
 export const AgentState = Annotation.Root({
-  messages: Annotation<BaseMessage[]>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
+  ...MessagesAnnotation.spec,
   // Free-form context passed in from the web app at session start
   // (e.g. intake answers: role, response_style, intent).
   userContext: Annotation<Record<string, unknown>>({
