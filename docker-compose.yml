@@ -1,0 +1,58 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - LANGGRAPH_API_URL=http://agent:2024
+    env_file:
+      - apps/web/.env.local
+    volumes:
+      - ./apps/web:/repo/apps/web
+      - ./packages/shared-types:/repo/packages/shared-types
+      - web_node_modules:/repo/apps/web/node_modules
+    depends_on:
+      - agent
+
+  agent:
+    build:
+      context: .
+      dockerfile: apps/agent/Dockerfile
+    ports:
+      - "2024:2024"
+    env_file:
+      - apps/agent/.env.local
+    volumes:
+      - ./apps/agent:/repo/apps/agent
+      - ./packages/shared-types:/repo/packages/shared-types
+      - agent_node_modules:/repo/apps/agent/node_modules
+    # Uncomment if the agent needs Postgres-backed checkpointing / Redis:
+    # depends_on:
+    #   - postgres
+    #   - redis
+
+  # postgres:
+  #   image: postgres:16-alpine
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     - POSTGRES_USER=acadia
+  #     - POSTGRES_PASSWORD=acadia
+  #     - POSTGRES_DB=acadia_agent
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+
+volumes:
+  web_node_modules:
+  agent_node_modules:
+  # postgres_data:
+  # redis_data:
