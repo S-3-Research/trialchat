@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import type { ChatStarterPrompt } from "@/lib/types/prompts";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
-import { GetTrialsToolUI } from "@/components/assistant-ui/tool-ui";
+import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI } from "@/components/assistant-ui/tool-ui";
 
 /**
  * Thread UI built from native assistant-ui primitives, styled to match the
@@ -135,7 +135,11 @@ const AssistantMessage: FC = () => {
           components={{
             Text: MarkdownText,
             tools: {
-              by_name: { get_trials: GetTrialsToolUI },
+              by_name: {
+                get_trials: GetTrialsToolUI,
+                web_search: WebSearchToolUI,
+                knowledge_base: KnowledgeBaseToolUI,
+              },
               Fallback: ToolCallFallback,
             },
           }}

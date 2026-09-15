@@ -1,5 +1,5 @@
-import { tool } from "@langchain/core/tools";
 import { z } from "zod";
+import type { AgentTool } from "./registry.js";
 
 /**
  * Clinical trial search tool. Ported from the legacy ChatKit tool handler
@@ -11,7 +11,7 @@ import { z } from "zod";
 const TRIALS_API_URL =
   "https://ltqkud1tu1.execute-api.us-west-2.amazonaws.com/Prod/get_trials";
 
-const getTrialsSchema = z.object({
+const trialSearchSchema = z.object({
   age: z.number().int().min(0).max(200).optional(),
   min_age: z.number().int().min(0).max(200).optional(),
   max_age: z.number().int().min(0).max(200).optional(),
@@ -41,6 +41,8 @@ const getTrialsSchema = z.object({
   intervention_types: z.array(z.string()).optional(),
   phases: z.array(z.string()).optional(),
 });
+
+type TrialSearchArgs = z.infer<typeof trialSearchSchema>;
 
 // The external API nests trial fields under `clinical_trial`, locations
 // under `matched_locations[].facility_info.facility_location`, and match
@@ -96,64 +98,62 @@ function flattenTrial(raw: RawMatchedTrial) {
   };
 }
 
-export const getTrials = tool(
-  async (input) => {
-    const apiKey = process.env.CLINICAL_TRIALS_API_KEY;
-    if (!apiKey) {
+async function searchTrials(args: TrialSearchArgs) {
+  const apiKey = process.env.CLINICAL_TRIALS_API_KEY;
+  if (!apiKey) {
+    return {
+      success: false,
+      error: "Clinical trials API key not configured on the agent.",
+    };
+  }
+
+  const requestBody: Record<string, unknown> = { ...args, page: 1 };
+
+  try {
+    const response = await fetch(TRIALS_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
       return {
         success: false,
-        error: "Clinical trials API key not configured on the agent.",
+        error: `Clinical trials API error: ${response.status}`,
+        details: errorData,
       };
     }
 
-    const requestBody: Record<string, unknown> = { ...input, page: 1 };
+    const data = (await response.json()) as {
+      matched_trial?: RawMatchedTrial[];
+      summary_report?: string;
+    };
+    const matchedTrials = (data.matched_trial ?? []).map(flattenTrial);
 
-    try {
-      const response = await fetch(TRIALS_API_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-        },
-        body: JSON.stringify(requestBody),
-      });
+    return {
+      success: true,
+      count: matchedTrials.length,
+      trials: matchedTrials,
+      summary:
+        data.summary_report ?? `Found ${matchedTrials.length} matching trials`,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Failed to fetch clinical trials",
+    };
+  }
+}
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error: `Clinical trials API error: ${response.status}`,
-          details: errorData,
-        };
-      }
-
-      const data = (await response.json()) as {
-        matched_trial?: RawMatchedTrial[];
-        summary_report?: string;
-      };
-      const matchedTrials = (data.matched_trial ?? []).map(flattenTrial);
-
-      return {
-        success: true,
-        count: matchedTrials.length,
-        trials: matchedTrials,
-        summary:
-          data.summary_report ?? `Found ${matchedTrials.length} matching trials`,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error:
-          error instanceof Error ? error.message : "Failed to fetch clinical trials",
-      };
-    }
-  },
-  {
-    name: "get_trials",
-    description:
-      "Search for clinical trials matching patient criteria including age, sex, location, medical conditions, and preferences. Returns a list of matching trials with detailed information and match reports.",
-    schema: getTrialsSchema,
-  },
-);
-
-export const tools = [getTrials];
+export const trialSearchTool: AgentTool<TrialSearchArgs> = {
+  name: "trial_search",
+  description:
+    "Search for clinical trials matching patient criteria including age, sex, location, medical conditions, and preferences. Returns a list of matching trials with detailed information and match reports.",
+  schema: trialSearchSchema,
+  execute: searchTrials,
+};

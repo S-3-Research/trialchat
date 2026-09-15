@@ -126,3 +126,117 @@ export const GetTrialsToolUI: ToolCallMessagePartComponent<
   // prose, instead of duplicating them as cards.
   return null;
 };
+
+/**
+ * Rendering for the `web_search` and `knowledge_base` tool calls (see
+ * `apps/agent/src/tools/web-search.tool.ts` and
+ * `knowledge-base.tool.ts`). Unlike an earlier attempt at this, these are
+ * real function tools executed by the agent process itself (a standalone
+ * OpenAI API call each), so — like `get_trials` — there's a genuine
+ * "in progress" window while the request is in flight, and the result
+ * shape is exactly what each tool's `execute()` returns.
+ */
+
+type HostedToolArgs = { query?: string };
+
+type WebSearchResult = {
+  success: boolean;
+  error?: string;
+  count?: number;
+  sources?: { url: string; title: string }[];
+};
+
+type KnowledgeBaseResult = {
+  success: boolean;
+  error?: string;
+  count?: number;
+  results?: { filename?: string; score?: number }[];
+};
+
+function parseToolResult<T>(raw: unknown): T | undefined {
+  if (typeof raw !== "string") return raw as T | undefined;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return undefined;
+  }
+}
+
+const HostedToolSearchingState: FC<{ label: string; query?: string }> = ({
+  label,
+  query,
+}) => (
+  <div className="flex items-center gap-3 rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 px-4 py-3 my-2">
+    <div className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 animate-pulse">
+      <Search className="w-4 h-4" strokeWidth={1.75} />
+    </div>
+    <div className="text-[14px] text-slate-600 dark:text-slate-300">
+      {label}
+      {query ? (
+        <span className="text-slate-400 dark:text-slate-500"> — {query}</span>
+      ) : null}
+      <span className="inline-block w-1.5 animate-pulse">…</span>
+    </div>
+  </div>
+);
+
+export const WebSearchToolUI: ToolCallMessagePartComponent<
+  HostedToolArgs,
+  WebSearchResult
+> = ({ args, status, result: rawResult }) => {
+  if (status.type === "running" || status.type === "requires-action") {
+    return <HostedToolSearchingState label="Searching the web" query={args?.query} />;
+  }
+
+  const result = parseToolResult<WebSearchResult>(rawResult);
+
+  if (status.type === "incomplete" || result?.success === false) {
+    return (
+      <ErrorState
+        message={result?.error ?? "Web search failed. Continuing without it."}
+      />
+    );
+  }
+
+  // Render nothing when there were no sources — the assistant's reply (if
+  // any) already stands on its own. When sources were actually used, a
+  // brief note is more transparent than staying silent (helps distinguish
+  // "searched the web" from "answered from memory").
+  if (!result?.count) return null;
+
+  return (
+    <div className="text-[13px] text-slate-400 dark:text-slate-500 px-1 my-1.5">
+      Searched the web · {result.count} source{result.count === 1 ? "" : "s"}
+    </div>
+  );
+};
+
+export const KnowledgeBaseToolUI: ToolCallMessagePartComponent<
+  HostedToolArgs,
+  KnowledgeBaseResult
+> = ({ args, status, result: rawResult }) => {
+  if (status.type === "running" || status.type === "requires-action") {
+    return (
+      <HostedToolSearchingState label="Searching knowledge base" query={args?.query} />
+    );
+  }
+
+  const result = parseToolResult<KnowledgeBaseResult>(rawResult);
+
+  if (status.type === "incomplete" || result?.success === false) {
+    return (
+      <ErrorState
+        message={result?.error ?? "Knowledge base search failed. Continuing without it."}
+      />
+    );
+  }
+
+  if (!result?.count) return null;
+
+  return (
+    <div className="text-[13px] text-slate-400 dark:text-slate-500 px-1 my-1.5">
+      Searched the knowledge base · {result.count} source
+      {result.count === 1 ? "" : "s"}
+    </div>
+  );
+};

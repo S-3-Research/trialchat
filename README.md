@@ -150,43 +150,56 @@ four steps to add a new one.
 
 ### 1. Define the tool on the agent (`apps/agent`)
 
-Tools live in [apps/agent/src/tools/index.ts](apps/agent/src/tools/index.ts),
-built with LangChain's `tool()` helper and a zod schema:
+Every capability the agent can use — internal knowledge base, web search,
+our own APIs — is an `AgentTool` (see
+[apps/agent/src/tools/registry.ts](apps/agent/src/tools/registry.ts)): a
+plain function tool we implement and execute ourselves, built with a zod
+schema + an `execute()`, e.g.
+[apps/agent/src/tools/trial-search.tool.ts](apps/agent/src/tools/trial-search.tool.ts):
 
 ```ts
-export const getTrials = tool(
-  async (input) => {
-    // ...call an API, a DB, etc.
-    return { success: true, count, trials, summary };
-  },
-  {
-    name: "get_trials",
-    description: "Search for clinical trials matching patient criteria...",
-    schema: getTrialsSchema, // zod object — becomes the model-visible args schema
-  },
-);
-
-export const tools = [getTrials];
+export const trialSearchTool: AgentTool<TrialSearchArgs> = {
+  name: "trial_search",
+  description: "Search for clinical trials matching patient criteria...",
+  schema: trialSearchSchema, // zod object — becomes the model-visible args schema
+  execute: searchTrials, // calls the API, a DB, etc.
+};
 ```
 
-Keep the tool's return value **JSON-serializable and flat** — normalize any
-nested/awkward upstream API response into the shape your UI component wants
-to render (see `flattenTrial()` in the same file), rather than pushing that
-mapping into the frontend.
+This is deliberately the *only* flavor of `AgentTool` — even capabilities
+backed by an OpenAI-hosted feature under the hood (like
+[knowledge-base.tool.ts](apps/agent/src/tools/knowledge-base.tool.ts)'s
+`client.vectorStores.search()`, or
+[web-search.tool.ts](apps/agent/src/tools/web-search.tool.ts)'s standalone
+`client.responses.create({ tools: [{ type: "web_search" }] })` call) are
+wrapped this way rather than passed straight to the agent's main chat model
+as an OpenAI Responses API tool. Passing a hosted tool straight to the
+model was tried and reverted: OpenAI resolves those server-side inside the
+main model call, so they never show up as a standard tool_call, and the
+assistant-ui version in this repo doesn't render their raw
+`additional_kwargs.tool_outputs` shape. Wrapping everything as a plain
+function tool means every tool call/result round-trips through the exact
+same tool_call/ToolMessage protocol, which assistant-ui *does* render.
 
-Then bind the tool list to the model and let it decide when to call it —
-already wired in [apps/agent/src/nodes/callModel.ts](apps/agent/src/nodes/callModel.ts)
-(`new ChatOpenAI(...).bindTools(tools)`) and looped through a `ToolNode` in
-[apps/agent/src/graph.ts](apps/agent/src/graph.ts) via
-`addConditionalEdges("callModel", toolsCondition, { tools: "tools", [END]: END })`.
-Adding a new tool to the `tools` array is enough to make it available in the
-graph — no graph/node changes needed per tool.
+Keep `execute()`'s return value **JSON-serializable and flat** — normalize
+any nested/awkward upstream API response into the shape your UI component
+wants to render (see `flattenTrial()` in `trial-search.tool.ts`), rather
+than pushing that mapping into the frontend.
+
+Register the new tool in `tools` (and optionally a `toolPresets` bundle) in
+[registry.ts](apps/agent/src/tools/registry.ts), then list it under
+whichever node config(s) should have access to it — e.g.
+[apps/agent/src/configs/api-agent.config.ts](apps/agent/src/configs/api-agent.config.ts)'s
+`tools: toolPresets.trialMatching`. `createAgentNode`
+([apps/agent/src/factories/create-agent-node.ts](apps/agent/src/factories/create-agent-node.ts))
+binds those tools to the model and drives the call/execute/respond loop
+itself. No `graph.ts` changes are needed per tool, only per new *node*.
 
 Finally, mention the tool and any hard rules (e.g. "never invent a result,
-only report what the tool returned") in
-[apps/agent/src/prompts/system.ts](apps/agent/src/prompts/system.ts) — models
-are much less likely to call (or correctly rely on) a tool that isn't
-described in the system prompt.
+only report what the tool returned") in the node's `prompt` (e.g.
+[apps/agent/src/prompts/system.ts](apps/agent/src/prompts/system.ts) for
+`api_agent`) — models are much less likely to call (or correctly rely on) a
+tool that isn't described in the prompt.
 
 ### 2. Enable the tool's UI on the frontend (`apps/web`)
 

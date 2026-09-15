@@ -1,5 +1,7 @@
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 
+export type Intent = "knowledge" | "trial_matching" | "other";
+
 /**
  * Shared graph state for the Trial Chat agent.
  *
@@ -8,6 +10,10 @@ import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
  * message union — required for LangGraph Studio's chat view to recognize
  * this as a standard chat-compatible graph (a hand-rolled
  * `Annotation<BaseMessage[]>` loses that union in the generated schema).
+ *
+ * Every node reads/writes this single shared object; a node only needs to
+ * return the keys it wants to update (e.g. `{ intent: "knowledge" }`) — the
+ * reducers below take care of merging that into the running state.
  */
 export const AgentState = Annotation.Root({
   ...MessagesAnnotation.spec,
@@ -16,6 +22,32 @@ export const AgentState = Annotation.Root({
   userContext: Annotation<Record<string, unknown>>({
     reducer: (_left, right) => right,
     default: () => ({}),
+  }),
+  // Written by `intention` node; read by graph.ts's conditional edge to
+  // route to `knowledge` | `api_agent` | `other_questions`.
+  intent: Annotation<Intent | undefined>({
+    reducer: (_left, right) => right,
+    default: () => undefined,
+  }),
+  // Written by `suggestions` node; read by the web UI to render follow-up
+  // prompts under the assistant's reply.
+  suggestions: Annotation<string[] | undefined>({
+    reducer: (_left, right) => right,
+    default: () => undefined,
+  }),
+  // Reserved for future intake/profile data (e.g. condition, location, age)
+  // once it's threaded through from the web app rather than inferred by
+  // the model from chat history alone.
+  userProfile: Annotation<Record<string, unknown> | undefined>({
+    reducer: (_left, right) => right,
+    default: () => undefined,
+  }),
+  // Reserved for the `api_agent` branch to cache the last `get_trials`
+  // result for downstream nodes (e.g. `suggestions`) without re-parsing it
+  // out of `messages`.
+  trialResults: Annotation<unknown[] | undefined>({
+    reducer: (_left, right) => right,
+    default: () => undefined,
   }),
 });
 
