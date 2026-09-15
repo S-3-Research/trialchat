@@ -7,8 +7,12 @@ import {
   useLangGraphRuntime,
   type LangChainMessage,
 } from "@assistant-ui/react-langgraph";
+import { PanelLeft, X } from "lucide-react";
 import { createAgentClient, AGENT_ASSISTANT_ID } from "@/lib/agentClient";
+import { createThreadListAdapter } from "@/lib/threadListAdapter";
+import { getOrCreateGuestUserId } from "@/lib/guestId";
 import { ChatSurface } from "@/components/assistant-ui/ChatSurface";
+import { ThreadListSidebar } from "@/components/assistant-ui/ThreadListSidebar";
 import {
   PLACEHOLDER_INPUT,
   getGreetingForUser,
@@ -24,8 +28,10 @@ import {
 } from "@/lib/voiceDictationAdapters";
 
 /**
- * Phase B: LangGraph-backed chat panel with starter prompts / greeting
- * parity with the ChatKit experience.
+ * Phase B/D: LangGraph-backed chat panel with starter prompts / greeting
+ * parity with the ChatKit experience, plus a New Chat / history sidebar
+ * (Phase D) backed by LangGraph Server's own thread storage — see
+ * lib/threadListAdapter.ts.
  *
  * Talks to apps/agent through the same-origin /api/agent proxy (see
  * app/api/agent/[...path]/route.ts). Theme (dark/light) and font size are
@@ -37,6 +43,7 @@ export function AssistantPanel() {
   const client = useMemo(() => createAgentClient(), []);
   const isMobile = useIsMobile();
   const [intakeData, setIntakeData] = useState<IntakeData | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(INTAKE_STORAGE_KEY);
@@ -72,14 +79,16 @@ export function AssistantPanel() {
     [client]
   );
 
+  const threadListAdapter = useMemo(
+    () => createThreadListAdapter(client, getOrCreateGuestUserId()),
+    [client]
+  );
+
   const runtime = useLangGraphRuntime({
     unstable_allowCancellation: true,
+    unstable_threadListAdapter: threadListAdapter,
     stream,
     adapters: { dictation },
-    create: async () => {
-      const { thread_id } = await client.threads.create();
-      return { externalId: thread_id };
-    },
     load: async (externalId) => {
       const state = await client.threads.getState<{
         messages: LangChainMessage[];
@@ -92,14 +101,65 @@ export function AssistantPanel() {
   });
 
   return (
-    <div className="relative flex flex-1 w-full h-full rounded-[32px] flex-col overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_80px_-20px_rgba(30,41,59,0.18)] dark:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.5)] transition-colors">
+    <div className="relative flex flex-1 w-full h-full rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_80px_-20px_rgba(30,41,59,0.18)] dark:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.5)] transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
-        <ChatSurface
-          placeholder={PLACEHOLDER_INPUT}
-          greeting={greeting}
-          prompts={prompts}
-          intakeData={intakeData}
-        />
+        {/* Desktop: persistent sidebar */}
+        <div className="hidden md:flex md:w-64 md:shrink-0 flex-col border-r border-slate-200/70 dark:border-slate-700/60 p-3">
+          <ThreadListSidebar />
+        </div>
+
+        {/* Mobile: drawer toggled by the panel-left button below */}
+        {isMobile && sidebarOpen && (
+          <div className="absolute inset-0 z-30 flex">
+            <div className="w-72 max-w-[80%] h-full bg-white dark:bg-[#181D26] p-3 flex flex-col border-r border-slate-200/70 dark:border-slate-700/60">
+              <div className="flex items-center justify-between mb-2 shrink-0">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  Chats
+                </span>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  aria-label="Close chat history"
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <X className="w-4 h-4" strokeWidth={2} />
+                </button>
+              </div>
+              <div
+                className="flex-1 min-h-0"
+                onClick={(e) => {
+                  // Auto-close the drawer after picking/creating a thread.
+                  if ((e.target as HTMLElement).closest("button")) {
+                    setSidebarOpen(false);
+                  }
+                }}
+              >
+                <ThreadListSidebar />
+              </div>
+            </div>
+            <div
+              className="flex-1 bg-black/30"
+              onClick={() => setSidebarOpen(false)}
+            />
+          </div>
+        )}
+
+        <div className="relative flex flex-1 min-w-0 flex-col">
+          {isMobile && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open chat history"
+              className="absolute top-4 left-4 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300"
+            >
+              <PanelLeft className="w-4 h-4" strokeWidth={2} />
+            </button>
+          )}
+          <ChatSurface
+            placeholder={PLACEHOLDER_INPUT}
+            greeting={greeting}
+            prompts={prompts}
+            intakeData={intakeData}
+          />
+        </div>
       </AssistantRuntimeProvider>
     </div>
   );

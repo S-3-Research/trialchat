@@ -22,37 +22,29 @@ services:
       dockerfile: apps/agent/Dockerfile
     ports:
       - "2024:2024"
+    environment:
+      - DATABASE_URL=postgres://acadia:acadia@postgres:5432/acadia_agent
     env_file:
       - apps/agent/.env.local
     volumes:
       - ./apps/agent:/repo/apps/agent
       - ./packages/shared-types:/repo/packages/shared-types
       - agent_node_modules:/repo/apps/agent/node_modules
-    # Uncomment if the agent needs Postgres-backed checkpointing / Redis:
-    # depends_on:
-    #   - postgres
-    #   - redis
+    depends_on:
+      - postgres
 
-  # postgres:
-  #   image: postgres:16-alpine
-  #   ports:
-  #     - "5432:5432"
-  #   environment:
-  #     - POSTGRES_USER=acadia
-  #     - POSTGRES_PASSWORD=acadia
-  #     - POSTGRES_DB=acadia_agent
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=acadia
+      - POSTGRES_PASSWORD=acadia
+      - POSTGRES_DB=acadia_agent
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
   web_node_modules:
   agent_node_modules:
-  # postgres_data:
-  # redis_data:
+  postgres_data:

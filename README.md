@@ -66,6 +66,23 @@ When running natively, [apps/web](apps/web) reaches the agent via
 container instead uses `LANGGRAPH_API_URL=http://agent:2024` — see the root
 [.env.example](.env.example) for details.
 
+**Thread persistence:** the agent checkpoints conversation state to Postgres
+via `DATABASE_URL` (see [apps/agent/.env.example](apps/agent/.env.example)).
+Docker Compose provisions this automatically (the `postgres` service). When
+running the agent natively (Option B), start a local Postgres yourself, e.g.:
+
+```bash
+docker run -d --name acadia-agent-postgres --restart unless-stopped \
+  -e POSTGRES_USER=acadia -e POSTGRES_PASSWORD=acadia -e POSTGRES_DB=acadia_agent \
+  -p 5433:5432 -v acadia_agent_pgdata:/var/lib/postgresql/data postgres:16-alpine
+
+echo "DATABASE_URL=postgres://acadia:acadia@localhost:5433/acadia_agent" >> apps/agent/.env.local
+```
+
+If `DATABASE_URL` is omitted, the agent falls back to an in-memory
+checkpointer (conversations are lost on every restart) — fine for quick
+one-off testing, not for anything you want to keep.
+
 ### 1. Install dependencies
 
 ```bash
