@@ -11,4 +11,5 @@ export const apiAgentConfig = {
   prompt: SYSTEM_PROMPT,
   tools: toolPresets.trialMatching,
   activityLabel: "Finding matching trials",
+  maxCallsPerTool: 1,
 };

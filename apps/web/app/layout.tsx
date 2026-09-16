@@ -5,6 +5,10 @@ import { FontSizeProvider } from "@/contexts/FontSizeContext";
 import { VoiceInputModeProvider } from "@/contexts/VoiceInputModeContext";
 import { ColorSchemeProvider } from "@/contexts/ColorSchemeContext";
 import { ThemeScript } from "@/components/ThemeScript";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "S-3 Demo",
@@ -17,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-      <html lang="en" className="text-base">
+      <html lang="en" className={cn("text-base", "font-sans", geist.variable)}>
         <head>
           <ThemeScript />
           <Script

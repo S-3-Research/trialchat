@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import type { ChatStarterPrompt } from "@/lib/types/prompts";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
-import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI, ThinkingAccordion } from "@/components/assistant-ui/tool-ui";
+import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI, ThinkingAccordion, ThinkingDots, ThreadThinkingIndicator } from "@/components/assistant-ui/tool-ui";
 
 /**
  * Thread UI built from native assistant-ui primitives, styled to match the
@@ -57,6 +57,14 @@ export const Thread: FC<{
               AssistantMessage,
             }}
           />
+          {/*
+           * Thread-scoped (not message-scoped) indicator covering the gap
+           * between the user sending a message and any assistant message
+           * shell existing yet — i.e. while LangGraph's `intention`
+           * classifier node is running, before a branch node has appended
+           * anything. See ThreadThinkingIndicator's doc comment.
+           */}
+          <ThreadThinkingIndicator />
         </div>
       </ThreadPrimitive.Viewport>
 
@@ -140,34 +148,30 @@ const AssistantMessage: FC = () => {
          * collapsible "Thought for Ns" group via `groupPartByType`, which
          * groups by real adjacency in the parts array (no reordering, no
          * synthetic data messages) — see tool-ui.tsx's `ThinkingAccordion`.
+         * The raw reasoning summary text itself is intentionally never
+         * rendered (see tool-ui.tsx) — `ThinkingAccordion` derives its own
+         * plain-text tool-call timeline directly from live part state via
+         * `indices`, so `children` (the group's recursively-rendered
+         * subtree) isn't needed/passed here.
          */}
+        <ThinkingDots />
         <MessagePrimitive.GroupedParts
           groupBy={groupPartByType({
             reasoning: ["group-thought"],
             "tool-call": ["group-thought"],
           })}
         >
-          {({ part, children }) => {
+          {({ part }) => {
             switch (part.type) {
               case "group-thought":
                 return (
-                  <ThinkingAccordion status={part.status} indices={part.indices}>
-                    {children}
-                  </ThinkingAccordion>
+                  <ThinkingAccordion status={part.status} indices={part.indices} />
                 );
               case "text":
                 return <MarkdownText />;
               case "reasoning":
-                // Rendered as part of the enclosing ThinkingAccordion's
-                // `children` (the group's recursively-rendered subtree) —
-                // see `case "group-thought"` above. `part.text` is the
-                // streamed reasoning summary text (see
-                // apps/agent/src/factories/create-agent-node.ts).
-                return part.text ? (
-                  <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
-                    {part.text}
-                  </p>
-                ) : null;
+                // Intentionally not rendered — see comment above.
+                return null;
               case "tool-call":
                 // Rendered directly from the part's own fields (not via
                 // `part.toolUI`) since that requires registering each tool
@@ -175,8 +179,18 @@ const AssistantMessage: FC = () => {
                 // deprecated `useAssistantToolUI` hook) — these components
                 // already tolerate the raw args/result shapes LangGraph's
                 // tool_call/ToolMessage protocol produces (see tool-ui.tsx).
+                //
+                // A call rejected by `maxCallsPerTool` (see
+                // create-agent-node.ts) carries `artifact: { rejected: true
+                // }` on its ToolMessage so it round-trips here as
+                // `part.artifact` — it's not a real invocation (no request
+                // was made), so it renders nothing rather than a spurious
+                // "no results"/error card.
+                if ((part.artifact as { rejected?: boolean } | undefined)?.rejected) {
+                  return null;
+                }
                 switch (part.toolName) {
-                  case "get_trials":
+                  case "trial_search":
                     return <GetTrialsToolUI {...(part as any)} />;
                   case "web_search":
                     return <WebSearchToolUI {...(part as any)} />;

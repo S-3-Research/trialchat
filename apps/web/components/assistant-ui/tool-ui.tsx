@@ -11,12 +11,15 @@ import {
   Search,
   AlertCircle,
   Sparkles,
-  ChevronRight,
   Loader2,
   Check,
   X,
   BookOpen,
 } from "lucide-react";
+import {
+  ReasoningPanel,
+  type ReasoningStep,
+} from "@/components/assistant-ui/elements/reasoning-panel";
 
 /**
  * Shared visual shell for every tool-call card (`get_trials`/`web_search`/
@@ -352,7 +355,7 @@ export const SuggestionsWidget: DataMessagePartComponent<{
  * this one frontend-only label; wording is kept in sync by hand.
  */
 const TOOL_SUMMARY_LABEL: Record<string, string> = {
-  get_trials: "Searching clinical trials",
+  trial_search: "Searching clinical trials",
   web_search: "Searching the web",
   knowledge_base: "Searching knowledge base",
 };
@@ -365,36 +368,112 @@ const TOOL_SUMMARY_LABEL: Record<string, string> = {
  * of-thought effect using assistant-ui's real message parts — no synthetic
  * state/widget, no message-id binding tricks.
  *
- * `reasoning` parts only exist when the underlying model runs on OpenAI's
- * Responses API with `reasoning.summary` enabled (currently the
- * knowledge/api_agent/other_questions branches on gpt-5-mini — see
- * apps/agent/src/factories/create-agent-node.ts); `tool-call` parts always
- * exist. Either or both may appear in a given group, and the elapsed time
- * shown is simply "since this component mounted" for the duration the
- * group's parts are still streaming.
- *
- * While collapsed, `children` (the full reasoning text + tool-call cards,
- * rendered by `MessagePrimitive.GroupedParts` — see thread.tsx) is NOT
- * rendered, to keep the collapsed state lightweight (no offscreen tool-call
- * card DOM). Instead, `indices` (the group's part indices, provided by
- * `GroupedParts`) is used to look up the live part data directly via
- * `useAuiState` and render a plain-text summary line per running tool-call
- * (stacked vertically when more than one tool runs in parallel) — this is
- * *only* a summary line, not a compact copy of the full tool-call card.
+ * Renders a plain-text timeline (one line per tool call, in the order
+ * they ran, plus a trailing "Done" once the group finishes) instead of
+ * the raw reasoning summary text or the full tool-call cards — reasoning
+ * text is intentionally not displayed at all (see chat discussion: the
+ * model's reasoning summary isn't reliable/stable enough to show
+ * verbatim, and duplicating it via `content[]`/`additional_kwargs` was a
+ * source of rendering bugs). `indices` (the group's part indices,
+ * provided by `GroupedParts`) is used to look up the live `tool-call`
+ * parts directly via `useAuiState`, independent of whatever `children`
+ * `GroupedParts` would otherwise recursively render — so this component
+ * never needs to mount the heavier `ToolCallCard`/reasoning-paragraph
+ * subtree at all, collapsed or expanded.
+ */
+const MAX_STEP_DETAIL_LENGTH = 70;
+
+const truncate = (text: string, max: number): string =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+
+const getToolStepTitle = (part: PartState & { type: "tool-call" }): string =>
+  TOOL_SUMMARY_LABEL[part.toolName] ?? `Using ${part.toolName}`;
+
+/**
+ * Extra detail shown under a step's title (the `body` in `ReasoningPanel`'s
+ * `{ title, body }` shape) — the search criteria/query for that specific
+ * call, kept out of `title` so the timeline's title column stays a short,
+ * stable label per tool rather than growing/shrinking per call. Truncated
+ * since args (e.g. a long list of conditions) can otherwise overflow the
+ * panel's fixed-width layout.
+ */
+const getToolStepDetail = (
+  part: PartState & { type: "tool-call" }
+): string => {
+  const args = (part.args ?? {}) as Record<string, unknown>;
+  if (part.toolName === "trial_search") {
+    const conditions = args.conditions;
+    const criteria = [
+      Array.isArray(conditions) && conditions.length
+        ? conditions.join(", ")
+        : null,
+      args.city || args.state
+        ? [args.city, args.state].filter(Boolean).join(", ")
+        : (args.zipcode as string | undefined) ?? null,
+      args.age ? `age ${args.age}` : null,
+    ].filter(Boolean);
+    return criteria.length ? truncate(criteria.join(" · "), MAX_STEP_DETAIL_LENGTH) : "";
+  }
+  if (
+    (part.toolName === "web_search" || part.toolName === "knowledge_base") &&
+    typeof args.query === "string" &&
+    args.query
+  ) {
+    return truncate(args.query, MAX_STEP_DETAIL_LENGTH);
+  }
+  return "";
+};
+
+type ThinkingStep = {
+  key: string;
+  title: string;
+  detail: string;
+  status: "running" | "complete" | "error";
+};
+
+const useThinkingSteps = (indices: readonly number[]): ThinkingStep[] => {
+  const parts = useAuiState((s) => s.message.parts);
+  return indices
+    .map((i) => parts[i])
+    .filter(
+      (p): p is PartState & { type: "tool-call" } => p?.type === "tool-call"
+    )
+    // Drop calls the agent rejected for exceeding `maxCallsPerTool` (see
+    // create-agent-node.ts) — these carry a real ToolMessage/part so the
+    // model has something to read, but they're not an actual tool
+    // invocation and would otherwise show up as a spurious extra step
+    // ("Searching the web" appearing 2x for what was really one search).
+    .filter(
+      (p) => !(p.artifact as { rejected?: boolean } | undefined)?.rejected
+    )
+    .map((p) => ({
+      key: p.toolCallId,
+      title: getToolStepTitle(p),
+      detail: getToolStepDetail(p),
+      status:
+        p.status.type === "running"
+          ? "running"
+          : p.status.type === "incomplete"
+            ? "error"
+            : "complete",
+    }));
+};
+
+/**
+ * Wraps the `@assistant-ui/elements-reasoning-panel` component (installed
+ * via `npx shadcn add "@assistant-ui/elements-reasoning-panel"` — see
+ * components/assistant-ui/elements/reasoning-panel.tsx) with steps derived
+ * from `tool-call` parts instead of the model's raw `reasoning` part text.
+ * `ReasoningPanel` itself is a pure `steps`/`open`/`streaming` props-driven
+ * component with no idea where steps come from, so this is the only glue
+ * needed — no fork of the installed component required.
  */
 export const ThinkingAccordion: FC<{
-  children: React.ReactNode;
   status: { type: string };
   indices: readonly number[];
-}> = ({ children, status, indices }) => {
+}> = ({ status, indices }) => {
   const [open, setOpen] = useState(false);
-  // Tracks whether the panel has ever been opened — used to avoid mounting
-  // `children` (the full reasoning text + tool-call cards) at all until
-  // the user actually opens it once, keeping the collapsed state cheap.
-  // Once opened, `children` stays mounted (just animated to zero height via
-  // `.accordion-rows`) so re-closing/re-opening gets the smooth grid-rows
-  // transition instead of a jarring mount/unmount.
-  const [everOpened, setEverOpened] = useState(false);
+  const [userOpened, setUserOpened] = useState(false);
   const [startedAt] = useState(() => Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const isRunning = status.type === "running";
@@ -407,63 +486,138 @@ export const ThinkingAccordion: FC<{
     return () => clearInterval(interval);
   }, [isRunning, startedAt]);
 
-  // Only computed/read while collapsed-and-running — the summary line is
-  // pointless once expanded (children shows the real thing) or once done
-  // (nothing is actively "running" to summarize).
-  const parts = useAuiState((s) => s.message.parts);
-  const runningToolLabels =
-    !open && isRunning
-      ? Array.from(
-          new Set(
-            indices
-              .map((i) => parts[i])
-              .filter(
-                (p): p is PartState & { type: "tool-call" } =>
-                  p?.type === "tool-call" && p.status.type === "running"
-              )
-              .map((p) => TOOL_SUMMARY_LABEL[p.toolName] ?? `Using ${p.toolName}`)
-          )
-        )
-      : [];
+  const steps = useThinkingSteps(indices);
+  const panelSteps: ReasoningStep[] = steps.map((s) => ({
+    title: s.status === "error" ? `${s.title} (failed)` : s.title,
+    body: s.detail,
+  }));
+  if (!isRunning) panelSteps.push({ title: "Done", body: "" });
 
   return (
-    <div className="mb-2">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => {
-          const next = !v;
-          if (next) setEverOpened(true);
-          return next;
-        })}
-        className="group flex items-center gap-1.5 text-[13px] text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-      >
-        <ChevronRight
-          className={`w-3.5 h-3.5 transition-transform shrink-0 ${open ? "rotate-90" : ""}`}
-          strokeWidth={2}
-        />
-        {isRunning && (
-          <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" strokeWidth={2} />
-        )}
-        <span className={isRunning ? "shimmer text-foreground/60" : ""}>
-          {isRunning ? `Thinking for ${elapsedSeconds}s` : `Thought for ${elapsedSeconds}s`}
-        </span>
-      </button>
-      {runningToolLabels.length > 0 ? (
-        <div className="flex flex-col gap-0.5 mt-1 pl-5">
-          {runningToolLabels.map((label) => (
-            <span key={label} className="shimmer text-foreground/50 text-[12.5px]">
-              {label}
-            </span>
-          ))}
-        </div>
-      ) : null}
-      <div className={`accordion-rows ${open ? "accordion-open" : "accordion-closed"}`}>
-        <div className="flex flex-col gap-1.5 mt-1.5 pl-1.5 border-l border-slate-200/70 dark:border-slate-700/60">
-          <div className="pl-2">{everOpened ? children : null}</div>
-        </div>
+    <ReasoningPanel
+      steps={panelSteps}
+      visibleSteps={panelSteps.length}
+      streaming={isRunning}
+      open={userOpened ? open : isRunning}
+      onOpenChange={(next) => {
+        setUserOpened(true);
+        setOpen(next);
+      }}
+      restingLabel={`Thought for ${elapsedSeconds}s`}
+      className="max-w-none"
+    />
+  );
+};
+
+/**
+ * Three pulsing dots shown in place of the `ThinkingAccordion` before the
+ * message has any parts yet (i.e. before the model's first token/tool-call
+ * has streamed in) — covers the otherwise-empty gap between the user
+ * sending a message and anything appearing on screen. Animates out
+ * (fade + slide up) as soon as real content starts arriving, instead of
+ * abruptly disappearing.
+ */
+export const ThinkingDots: FC = () => {
+  const parts = useAuiState((s) => s.message.parts);
+  const status = useAuiState((s) => s.message.status);
+  // Don't just check `parts.length === 0` — LangGraph/assistant-ui often
+  // append an empty placeholder `text` part before any real token has
+  // streamed in, and a branch may take a moment after that before its
+  // first `reasoning`/`tool-call` part (which is what actually triggers
+  // the `group-thought` accordion) arrives. Checking raw part *count*
+  // caused the dots to disappear the instant that empty placeholder
+  // showed up, leaving a blank gap before the accordion (or real text)
+  // appeared. Instead, keep the dots up until something is actually
+  // visible: non-empty text, a reasoning part, or a tool-call part.
+  const hasVisibleContent = parts.some(
+    (p) =>
+      (p.type === "text" && p.text.trim().length > 0) ||
+      p.type === "reasoning" ||
+      p.type === "tool-call"
+  );
+  const shouldShow = !hasVisibleContent && status?.type === "running";
+  const [mounted, setMounted] = useState(shouldShow);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    if (shouldShow) {
+      setMounted(true);
+      setLeaving(false);
+      return;
+    }
+    if (mounted) {
+      setLeaving(true);
+      const timeout = setTimeout(() => setMounted(false), 220);
+      return () => clearTimeout(timeout);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldShow]);
+
+  if (!mounted) return null;
+
+  return (
+    <div className={`thinking-dots-wrap ${leaving ? "thinking-dots-leave" : ""}`}>
+      <span className="thinking-dot" />
+      <span className="thinking-dot" />
+      <span className="thinking-dot" />
+    </div>
+  );
+};
+
+/**
+ * Thread-level counterpart to `ThinkingDots` above. `ThinkingDots` is
+ * scoped to a single assistant message and can only mount once that
+ * message's shell already exists — but LangGraph's `intention` classifier
+ * node runs *before* any branch node appends a message, so there's a real
+ * gap (classifier LLM call latency) where the thread is running yet no
+ * message — assistant or otherwise — exists for it to attach to.
+ *
+ * This component is scoped to the *thread*, not a message, so it can cover
+ * exactly that gap: it shows whenever the thread is running and the last
+ * message is still the user's (i.e. no assistant message has started
+ * streaming yet for this turn). As soon as the first assistant message
+ * part arrives, `ThinkingDots`/`ThinkingAccordion` take over and this
+ * unmounts — so at most one "thinking" indicator is ever visible at once.
+ *
+ * Render this once, directly under `ThreadPrimitive.Messages` in
+ * `thread.tsx` (i.e. as a thread-scoped sibling, not inside a message).
+ */
+export const ThreadThinkingIndicator: FC = () => {
+  const isRunning = useAuiState((s) => s.thread.isRunning);
+  const lastRole = useAuiState((s) => {
+    const messages = s.thread.messages;
+    return messages[messages.length - 1]?.role;
+  });
+  const shouldShow = isRunning && lastRole === "user";
+  const [mounted, setMounted] = useState(shouldShow);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    if (shouldShow) {
+      setMounted(true);
+      setLeaving(false);
+      return;
+    }
+    if (mounted) {
+      setLeaving(true);
+      const timeout = setTimeout(() => setMounted(false), 220);
+      return () => clearTimeout(timeout);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldShow]);
+
+  if (!mounted) return null;
+
+  return (
+    <div className="max-w-[92%] w-full">
+      <div className={`thinking-dots-wrap ${leaving ? "thinking-dots-leave" : ""}`}>
+        <span className="thinking-dot" />
+        <span className="thinking-dot" />
+        <span className="thinking-dot" />
       </div>
     </div>
   );
 };
+
 
 

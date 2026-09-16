@@ -95,9 +95,18 @@ export function createAgentNode(config: AgentNodeConfig) {
           }
           const count = callCounts.get(call.name) ?? 0;
           if (config.maxCallsPerTool && count >= config.maxCallsPerTool) {
+            // Marked via `artifact` (LangChain's UI-only, non-model-visible
+            // payload on ToolMessage — round-trips to the frontend as
+            // `part.artifact`, see convertLangChainMessages.js) rather than
+            // baked into `content`, so the frontend can tell "the model was
+            // rejected for exceeding maxCallsPerTool" apart from a real
+            // tool result and skip rendering a spurious extra timeline
+            // step for it (see tool-ui.tsx's `useThinkingSteps`) — the
+            // model still sees the corrective text in `content` either way.
             return new ToolMessage({
               tool_call_id: call.id!,
               content: `${call.name} has already been called the maximum number of times (${config.maxCallsPerTool}) for this request. Use the results you already have to answer the user instead of calling it again.`,
+              artifact: { rejected: true },
             });
           }
           callCounts.set(call.name, count + 1);
