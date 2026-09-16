@@ -1,4 +1,9 @@
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
+import {
+  uiMessageReducer,
+  type UIMessage,
+  type RemoveUIMessage,
+} from "@langchain/langgraph-sdk/react-ui/server";
 
 export type Intent = "knowledge" | "trial_matching" | "other";
 
@@ -29,11 +34,19 @@ export const AgentState = Annotation.Root({
     reducer: (_left, right) => right,
     default: () => undefined,
   }),
-  // Written by `suggestions` node; read by the web UI to render follow-up
-  // prompts under the assistant's reply.
-  suggestions: Annotation<string[] | undefined>({
-    reducer: (_left, right) => right,
-    default: () => undefined,
+  // Written by `suggestions_agent` via `typedUi(config).push(...)` (see
+  // apps/agent/src/nodes/suggestions.ts) — Generative UI messages, each
+  // bound (via `metadata.id`) to the assistant message they're follow-ups
+  // for. `uiMessageReducer` handles both "ui" (upsert) and "remove-ui"
+  // events, dropping removed entries — so the channel's *state* type is
+  // always a plain `UIMessage[]`, even though updates written to it can be
+  // a `RemoveUIMessage`. assistant-ui's `useLangGraphRuntime` reads this
+  // list directly off the live stream, and the web app's thread-reload
+  // `load` callback reads it back out of `state.values.ui` for persistence
+  // across reloads.
+  ui: Annotation<UIMessage[], UIMessage | RemoveUIMessage | (UIMessage | RemoveUIMessage)[]>({
+    reducer: uiMessageReducer,
+    default: () => [],
   }),
   // Reserved for future intake/profile data (e.g. condition, location, age)
   // once it's threaded through from the web app rather than inferred by

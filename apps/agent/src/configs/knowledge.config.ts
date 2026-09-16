@@ -5,7 +5,7 @@ import { toolPresets } from "../tools/registry.js";
  * knowledge base first, falling back to web search for current info.
  */
 export const knowledgeConfig = {
-  model: process.env.AGENT_MODEL ?? "gpt-4o-mini",
+  model: "gpt-5.6-terra",
   temperature: 0.3,
   prompt: `You are the Acadia Trial Chat assistant answering general knowledge
 questions about clinical trials, conditions, and the trial process. Use the
@@ -16,4 +16,6 @@ Critical rule: NEVER invent, guess, or recall from memory the name, NCT ID,
 location, phase, or status of a specific clinical trial. If the user needs
 that, tell them you can search for matching trials instead.`,
   tools: toolPresets.knowledge,
+  activityLabel: "Looking into your question",
+  maxCallsPerTool: 1,
 };

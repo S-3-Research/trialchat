@@ -11,35 +11,128 @@ import type { AgentTool } from "./registry.js";
 const TRIALS_API_URL =
   "https://ltqkud1tu1.execute-api.us-west-2.amazonaws.com/Prod/get_trials";
 
+const INTERVENTION_TYPES = [
+  "drug",
+  "device",
+  "biological/vaccine",
+  "procedure/surgery",
+  "radiation",
+  "behavioral",
+  "genetic",
+  "dietary_supplement",
+  "combination_product",
+  "diagnostic_test",
+  "other",
+] as const;
+
+const PHASES = [
+  "na",
+  "early_phase1",
+  "phase1",
+  "phase2",
+  "phase3",
+  "phase4",
+] as const;
+
 const trialSearchSchema = z.object({
-  age: z.number().int().min(0).max(200).optional(),
-  min_age: z.number().int().min(0).max(200).optional(),
-  max_age: z.number().int().min(0).max(200).optional(),
-  sex: z.enum(["male", "female", "all"]).optional(),
-  street: z.string().optional(),
-  city: z.string().optional(),
-  county: z.string().optional(),
-  state: z.string().optional(),
-  country: z.string().optional(),
-  zipcode: z.string().optional(),
-  lat: z.number().optional(),
-  lon: z.number().optional(),
+  age: z
+    .number()
+    .int()
+    .min(0)
+    .max(200)
+    .optional()
+    .describe("Age of the patient, must be between 0 and 200."),
+  min_age: z
+    .number()
+    .int()
+    .min(0)
+    .max(200)
+    .optional()
+    .describe("Minimum age of the patient, must be between 0 and 200."),
+  max_age: z
+    .number()
+    .int()
+    .min(0)
+    .max(200)
+    .optional()
+    .describe("Maximum age of the patient, must be between 0 and 200."),
+  sex: z
+    .enum(["male", "female", "all"])
+    .optional()
+    .describe("Sex of the patient, represented as an enumeration."),
+  street: z.string().optional().describe("Street address of the location"),
+  city: z.string().optional().describe("City of the location"),
+  county: z.string().optional().describe("County of the location"),
+  state: z.string().optional().describe("State or province of the location"),
+  country: z.string().optional().describe("Country of the location"),
+  zipcode: z.string().optional().describe("Postal code of the location"),
+  lon: z.number().optional().describe("Longitude of the location"),
+  lat: z.number().optional().describe("Latitude of the location"),
   conditions: z
     .array(z.string())
     .optional()
-    .describe("Medical conditions the patient has, e.g. ['Alzheimer Disease']"),
+    .describe("List of medical conditions the patient has, e.g. ['Alzheimer Disease']"),
   pref_distance: z
     .number()
+    .int()
     .optional()
-    .describe("Preferred maximum distance (miles) for clinical trials."),
-  drive_duration: z.number().optional(),
+    .describe("Preferred maximum distance (in miles) for clinical trials."),
+  drive_duration: z
+    .number()
+    .optional()
+    .describe(
+      "Preferred maximum driving duration (in hours) to the clinical trial location."
+    ),
+  start_year: z
+    .number()
+    .int()
+    .optional()
+    .describe("Preferred start year for the clinical trial."),
+  start_month: z
+    .number()
+    .int()
+    .optional()
+    .describe("Preferred start month for the clinical trial."),
+  start_day: z
+    .number()
+    .int()
+    .optional()
+    .describe("Preferred start day for the clinical trial."),
+  end_year: z
+    .number()
+    .int()
+    .optional()
+    .describe("Preferred end year for the clinical trial."),
+  end_month: z
+    .number()
+    .int()
+    .optional()
+    .describe("Preferred end month for the clinical trial."),
+  end_day: z
+    .number()
+    .int()
+    .optional()
+    .describe("Preferred end day for the clinical trial."),
   top_n: z
     .number()
     .int()
     .optional()
-    .describe("Number of top clinical trials to return, recommended 5-10."),
-  intervention_types: z.array(z.string()).optional(),
-  phases: z.array(z.string()).optional(),
+    .describe(
+      "Number of top clinical trials to return based on the matching criteria, recommended 5-10."
+    ),
+  intervention_types: z
+    .array(z.enum(INTERVENTION_TYPES))
+    .optional()
+    .describe("List of preferred intervention types for the clinical trials."),
+  phases: z
+    .array(z.enum(PHASES))
+    .optional()
+    .describe("List of preferred clinical trial phases."),
+  page: z
+    .number()
+    .int()
+    .optional()
+    .describe("The page number for the clinical trial result to show."),
 });
 
 type TrialSearchArgs = z.infer<typeof trialSearchSchema>;
@@ -107,7 +200,7 @@ async function searchTrials(args: TrialSearchArgs) {
     };
   }
 
-  const requestBody: Record<string, unknown> = { ...args, page: 1 };
+  const requestBody: Record<string, unknown> = { ...args, page: args.page ?? 1 };
 
   try {
     const response = await fetch(TRIALS_API_URL, {
@@ -152,6 +245,7 @@ async function searchTrials(args: TrialSearchArgs) {
 
 export const trialSearchTool: AgentTool<TrialSearchArgs> = {
   name: "trial_search",
+  activityLabel: "Searching clinical trials",
   description:
     "Search for clinical trials matching patient criteria including age, sex, location, medical conditions, and preferences. Returns a list of matching trials with detailed information and match reports.",
   schema: trialSearchSchema,

@@ -31,6 +31,11 @@ import { trialSearchTool } from "./trial-search.tool.js";
 export type AgentTool<TArgs = any> = {
   name: string;
   description: string;
+  // User-friendly label for the activity/reasoning-summary widget (see
+  // lib/activity.ts) — e.g. "Searching clinical trials" — shown instead
+  // of the raw tool name while this tool is running. Falls back to `name`
+  // if omitted.
+  activityLabel?: string;
   schema: z.ZodType<TArgs>;
   execute: (args: TArgs) => Promise<unknown>;
 };

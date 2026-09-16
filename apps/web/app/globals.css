@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-shimmer";
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -33,6 +34,29 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/*
+ * Height-animatable collapse/expand without measuring content height in
+ * JS: the classic CSS grid-rows technique. Put `accordion-rows` on the
+ * wrapper and toggle `accordion-open`/`accordion-closed`; the single grid
+ * child (`accordion-rows > *`) must be a single element (a div) so
+ * `min-height: 0` lets it actually shrink to 0 rather than clamping to
+ * its content's intrinsic height.
+ */
+.accordion-rows {
+  display: grid;
+  transition: grid-template-rows 200ms ease;
+}
+.accordion-rows.accordion-closed {
+  grid-template-rows: 0fr;
+}
+.accordion-rows.accordion-open {
+  grid-template-rows: 1fr;
+}
+.accordion-rows > * {
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* ChatKitPanel fixed width breakpoints - Force desktop layout minimum width to prevent internal jump */

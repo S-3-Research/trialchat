@@ -7,6 +7,7 @@ import {
   MessagePrimitive,
   ActionBarPrimitive,
   AuiIf,
+  groupPartByType,
 } from "@assistant-ui/react";
 import {
   ArrowUp,
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import type { ChatStarterPrompt } from "@/lib/types/prompts";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
-import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI } from "@/components/assistant-ui/tool-ui";
+import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI, ThinkingAccordion } from "@/components/assistant-ui/tool-ui";
 
 /**
  * Thread UI built from native assistant-ui primitives, styled to match the
@@ -116,7 +117,6 @@ const ToolCallFallback: FC<{ toolName: string; status: { type: string } }> = ({
     {status.type === "running" ? "is running…" : `(${status.type})`}
   </div>
 );
-
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="flex justify-end">
@@ -131,19 +131,67 @@ const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="group flex justify-start">
       <div className="max-w-[92%] w-full text-slate-700 dark:text-slate-200 text-[15px] leading-[1.7]">
-        <MessagePrimitive.Content
-          components={{
-            Text: MarkdownText,
-            tools: {
-              by_name: {
-                get_trials: GetTrialsToolUI,
-                web_search: WebSearchToolUI,
-                knowledge_base: KnowledgeBaseToolUI,
-              },
-              Fallback: ToolCallFallback,
-            },
+        {/*
+         * `reasoning` parts only exist when the branch node's model runs
+         * on OpenAI's Responses API with `reasoning.summary` enabled (see
+         * apps/agent/src/factories/create-agent-node.ts) — currently the
+         * knowledge/api_agent/other_questions branches on gpt-5-mini.
+         * `tool-call` parts always exist. Both get coalesced into a single
+         * collapsible "Thought for Ns" group via `groupPartByType`, which
+         * groups by real adjacency in the parts array (no reordering, no
+         * synthetic data messages) — see tool-ui.tsx's `ThinkingAccordion`.
+         */}
+        <MessagePrimitive.GroupedParts
+          groupBy={groupPartByType({
+            reasoning: ["group-thought"],
+            "tool-call": ["group-thought"],
+          })}
+        >
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-thought":
+                return (
+                  <ThinkingAccordion status={part.status} indices={part.indices}>
+                    {children}
+                  </ThinkingAccordion>
+                );
+              case "text":
+                return <MarkdownText />;
+              case "reasoning":
+                // Rendered as part of the enclosing ThinkingAccordion's
+                // `children` (the group's recursively-rendered subtree) —
+                // see `case "group-thought"` above. `part.text` is the
+                // streamed reasoning summary text (see
+                // apps/agent/src/factories/create-agent-node.ts).
+                return part.text ? (
+                  <p className="text-[13px] text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
+                    {part.text}
+                  </p>
+                ) : null;
+              case "tool-call":
+                // Rendered directly from the part's own fields (not via
+                // `part.toolUI`) since that requires registering each tool
+                // in assistant-ui's global tool-UI registry (the
+                // deprecated `useAssistantToolUI` hook) — these components
+                // already tolerate the raw args/result shapes LangGraph's
+                // tool_call/ToolMessage protocol produces (see tool-ui.tsx).
+                switch (part.toolName) {
+                  case "get_trials":
+                    return <GetTrialsToolUI {...(part as any)} />;
+                  case "web_search":
+                    return <WebSearchToolUI {...(part as any)} />;
+                  case "knowledge_base":
+                    return <KnowledgeBaseToolUI {...(part as any)} />;
+                  default:
+                    return <ToolCallFallback toolName={part.toolName} status={part.status} />;
+                }
+              case "data":
+                return part.dataRendererUI;
+              default:
+                return null;
+            }
           }}
-        />
+        </MessagePrimitive.GroupedParts>
         <ActionBarPrimitive.Root className="flex items-center gap-1 mt-2 -ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <ActionBarPrimitive.Copy className="flex items-center justify-center w-7 h-7 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-300 dark:hover:bg-slate-800 transition-colors">
             <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />

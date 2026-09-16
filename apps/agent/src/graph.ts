@@ -14,6 +14,13 @@ import { getCheckpointer } from "./checkpointer.js";
  *                        +-> api_agent -------> suggestions_agent -> END
  *                        +-> other_questions -> suggestions_agent -> END
  *
+ * The three answer-facing branches run on a reasoning-capable model
+ * (gpt-5-mini) via OpenAI's Responses API with `reasoning.summary`
+ * enabled (see `factories/create-agent-node.ts`), so their AIMessage
+ * carries a real `additional_kwargs.reasoning` — surfaced on the frontend
+ * via assistant-ui's `MessagePrimitive.GroupedParts`, not a custom
+ * widget/state channel.
+ *
  * `intention` classifies the user's latest message ("knowledge" |
  * "trial_matching" | "other") and writes it to `state.intent`; the
  * conditional edge below routes to the matching specialist node. Each
@@ -23,8 +30,10 @@ import { getCheckpointer } from "./checkpointer.js";
  * *inside* that node, so there's no separate `tools` node here; which
  * tools a node has access to is entirely a `configs/*.config.ts` concern.
  * All three paths converge on `suggestions_agent`, which reads the full
- * conversation and writes follow-up prompts to `state.suggestions` for the
- * UI.
+ * conversation and pushes follow-up prompts to the UI as an explicit
+ * Generative UI message (via `typedUi(config).push(...)`, see
+ * `nodes/suggestions.ts`) bound to the preceding branch's assistant
+ * message id, rather than writing to a plain state field.
  *
  * Adding or tweaking a branch should only require touching this file plus
  * one node/config pair; adding a new *capability* (knowledge base, web
@@ -43,8 +52,9 @@ const workflow = new StateGraph(AgentState)
   .addNode("api_agent", apiAgent)
   .addNode("other_questions", otherQuestionsAgent)
   // Named "suggestions_agent" (not "suggestions") because LangGraph forbids
-  // a node name colliding with a state channel name — `state.suggestions`
-  // is where this node writes its output.
+  // a node name colliding with a state channel name — `state.ui` is the
+  // Generative UI channel this node's `typedUi(config).push(...)` call
+  // writes into (see nodes/suggestions.ts).
   .addNode("suggestions_agent", suggestionsAgent)
 
   .addEdge(START, "intention")

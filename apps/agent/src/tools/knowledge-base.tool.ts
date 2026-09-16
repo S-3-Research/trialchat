@@ -63,6 +63,7 @@ async function searchKnowledgeBase({ query }: KnowledgeBaseArgs) {
 
 export const knowledgeBaseTool: AgentTool<KnowledgeBaseArgs> = {
   name: "knowledge_base",
+  activityLabel: "Searching knowledge base",
   description:
     "Search the internal TrialChat knowledge base for general clinical-trial and condition information (not for finding specific trials — use trial_search for that).",
   schema: knowledgeBaseSchema,

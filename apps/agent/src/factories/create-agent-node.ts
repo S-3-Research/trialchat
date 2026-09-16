@@ -3,6 +3,7 @@ import { tool as makeLangChainTool } from "@langchain/core/tools";
 import { ChatOpenAI } from "@langchain/openai";
 import type { AgentStateType } from "../state.js";
 import type { AgentTool } from "../tools/registry.js";
+import { modelParams } from "../lib/model-params.js";
 
 /**
  * Config for a node built around `model + prompt + tools[]`. Every
@@ -29,6 +30,13 @@ export type AgentNodeConfig = {
   temperature?: number;
   prompt: string;
   tools?: AgentTool[];
+  // Caps how many times a single tool name may be *invoked* (not just
+  // called) within one node run, across all tool-loop iterations. Once a
+  // tool hits the cap, further model-issued calls to it short-circuit
+  // with a ToolMessage telling the model to use the result it already has
+  // instead of re-invoking. Omit for no per-tool cap (still bounded by
+  // MAX_TOOL_ITERATIONS overall).
+  maxCallsPerTool?: number;
 };
 
 const MAX_TOOL_ITERATIONS = 4;
@@ -44,11 +52,21 @@ export function createAgentNode(config: AgentNodeConfig) {
     })
   );
 
+  // These three answer-facing branches (knowledge/api_agent/other_questions)
+  // run on a reasoning-capable model via OpenAI's Responses API so we can
+  // surface a real `reasoning.summary` on the AIMessage (used to drive a
+  // ChatKit-style "Thought for Ns" UI via assistant-ui's GroupedParts).
+  // `reasoning`/`useResponsesApi` are silently ignored for non-reasoning
+  // models, so this only takes effect when `config.model` is a reasoning
+  // model (e.g. gpt-5-mini) — see configs/*.config.ts.
   const base = new ChatOpenAI({
-    model: config.model ?? "gpt-4o-mini",
-    temperature: config.temperature ?? 0.3,
+    ...modelParams(config.model ?? "gpt-5-mini", config.temperature ?? 0.3),
+    useResponsesApi: true,
+    reasoning: { summary: "detailed" },
   });
-  const model = langChainTools.length ? base.bindTools(langChainTools) : base;
+  const model = langChainTools.length
+    ? base.bindTools(langChainTools, { parallel_tool_calls: true })
+    : base;
 
   const toolsByName = new Map(langChainTools.map((t) => [t.name, t]));
 
@@ -60,6 +78,8 @@ export function createAgentNode(config: AgentNodeConfig) {
 
     let response = (await model.invoke(messages)) as AIMessage;
     const newMessages: (AIMessage | ToolMessage)[] = [response];
+
+    const callCounts = new Map<string, number>();
 
     let iterations = 0;
     while (response.tool_calls?.length && iterations < MAX_TOOL_ITERATIONS) {
@@ -73,7 +93,16 @@ export function createAgentNode(config: AgentNodeConfig) {
               content: `Unknown tool: ${call.name}`,
             });
           }
-          return (await t.invoke(call)) as ToolMessage;
+          const count = callCounts.get(call.name) ?? 0;
+          if (config.maxCallsPerTool && count >= config.maxCallsPerTool) {
+            return new ToolMessage({
+              tool_call_id: call.id!,
+              content: `${call.name} has already been called the maximum number of times (${config.maxCallsPerTool}) for this request. Use the results you already have to answer the user instead of calling it again.`,
+            });
+          }
+          callCounts.set(call.name, count + 1);
+          const result = (await t.invoke(call)) as ToolMessage;
+          return result;
         })
       );
       newMessages.push(...toolMessages);
@@ -82,7 +111,9 @@ export function createAgentNode(config: AgentNodeConfig) {
       newMessages.push(response);
     }
 
-    return { messages: newMessages };
+    return {
+      messages: newMessages,
+    };
   };
 }
 

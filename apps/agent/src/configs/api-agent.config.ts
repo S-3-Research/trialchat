@@ -6,8 +6,9 @@ import { toolPresets } from "../tools/registry.js";
  * `web_search` for anything the trial API can't answer directly.
  */
 export const apiAgentConfig = {
-  model: process.env.AGENT_MODEL ?? "gpt-4o-mini",
+  model: process.env.AGENT_MODEL ?? "gpt-5-mini",
   temperature: 0.3,
   prompt: SYSTEM_PROMPT,
   tools: toolPresets.trialMatching,
+  activityLabel: "Finding matching trials",
 };

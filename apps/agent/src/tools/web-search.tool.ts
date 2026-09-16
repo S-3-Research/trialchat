@@ -70,6 +70,7 @@ async function searchWeb({ query }: WebSearchArgs) {
 
 export const webSearchTool: AgentTool<WebSearchArgs> = {
   name: "web_search",
+  activityLabel: "Searching the web",
   description: "Search the public web for current information not in the knowledge base.",
   schema: webSearchSchema,
   execute: searchWeb,

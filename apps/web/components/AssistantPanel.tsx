@@ -6,6 +6,7 @@ import {
   unstable_createLangGraphStream,
   useLangGraphRuntime,
   type LangChainMessage,
+  type UIMessage,
 } from "@assistant-ui/react-langgraph";
 import { PanelLeft, X } from "lucide-react";
 import { createAgentClient, AGENT_ASSISTANT_ID } from "@/lib/agentClient";
@@ -13,6 +14,7 @@ import { createThreadListAdapter } from "@/lib/threadListAdapter";
 import { getOrCreateGuestUserId } from "@/lib/guestId";
 import { ChatSurface } from "@/components/assistant-ui/ChatSurface";
 import { ThreadListSidebar } from "@/components/assistant-ui/ThreadListSidebar";
+import { SuggestionsWidget } from "@/components/assistant-ui/tool-ui";
 import {
   PLACEHOLDER_INPUT,
   getGreetingForUser,
@@ -89,12 +91,23 @@ export function AssistantPanel() {
     unstable_threadListAdapter: threadListAdapter,
     stream,
     adapters: { dictation },
+    // Generative UI: the agent's `suggestions_agent` node explicitly emits
+    // a named `{ name: "suggestions", props }` UI message via
+    // `typedUi(config).push(...)` (see apps/agent/src/nodes/suggestions.ts)
+    // bound to the assistant message it follows up on — this registers the
+    // React component that renders it wherever assistant-ui slots "data"
+    // message parts in, no per-message wiring needed in thread.tsx.
+    uiComponents: {
+      renderers: { suggestions: SuggestionsWidget },
+    },
     load: async (externalId) => {
       const state = await client.threads.getState<{
         messages: LangChainMessage[];
+        ui?: UIMessage[];
       }>(externalId);
       return {
         messages: state.values.messages ?? [],
+        uiMessages: state.values.ui ?? [],
         interrupts: state.tasks[0]?.interrupts,
       };
     },
