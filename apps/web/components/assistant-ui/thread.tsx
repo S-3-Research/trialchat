@@ -30,6 +30,14 @@ import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI, ThinkingAccordio
  * white rounded panel, soft diffuse shadows, generous whitespace, pale-blue
  * user bubbles, borderless assistant prose, and a floating pill composer.
  */
+/**
+ * Shared max-width for the message list, welcome screen, and composer so
+ * all three stay visually aligned within the panel — previously
+ * `max-w-3xl` was hand-repeated in three separate JSX spots below, an easy
+ * place for the values to drift out of sync.
+ */
+const CONTENT_MAX_WIDTH = "max-w-[52rem]";
+
 export const Thread: FC<{
   placeholder: string;
   greeting: string;
@@ -38,19 +46,19 @@ export const Thread: FC<{
   return (
     <ThreadPrimitive.Root className="flex flex-col h-full w-full bg-transparent">
       <ThreadPrimitive.Viewport
-        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-10 pb-8 pt-16 flex flex-col gap-6"
+        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-10 pb-4 pt-8 mt-14 flex flex-col"
         style={{
           maskImage:
-            "linear-gradient(to bottom, transparent, black 4.5rem, black 100%)",
+            "linear-gradient(to bottom, transparent, black 4.5rem, black calc(100% - 2rem), transparent 100%)",
           WebkitMaskImage:
-            "linear-gradient(to bottom, transparent, black 4.5rem, black 100%)",
+            "linear-gradient(to bottom, transparent, black 4.5rem, black calc(100% - 2rem), transparent 100%)",
         }}
       >
         <ThreadPrimitive.Empty>
           <ThreadWelcome greeting={greeting} prompts={prompts} />
         </ThreadPrimitive.Empty>
 
-        <div className="mx-auto w-full max-w-2xl flex flex-col gap-6">
+        <div className={`mx-auto w-full ${CONTENT_MAX_WIDTH} flex flex-col gap-6 px-6`}>
           <ThreadPrimitive.Messages
             components={{
               UserMessage,
@@ -69,7 +77,7 @@ export const Thread: FC<{
       </ThreadPrimitive.Viewport>
 
       <div className="shrink-0 px-6 sm:px-10 pb-6 pt-2">
-        <div className="mx-auto w-full max-w-2xl">
+        <div className={`mx-auto w-full ${CONTENT_MAX_WIDTH}`}>
           <Composer placeholder={placeholder} />
         </div>
       </div>
@@ -84,17 +92,14 @@ const ThreadWelcome: FC<{ greeting: string; prompts: ChatStarterPrompt[] }> = ({
   prompts,
 }) => {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-4 gap-8">
-      <div className="flex flex-col items-center gap-3 max-w-lg">
-        <div className="flex items-center justify-center w-11 h-11 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400">
-          <Sparkles className="w-5 h-5" strokeWidth={1.75} />
-        </div>
+    <div className={`flex-1 flex flex-col item-center mx-auto ${CONTENT_MAX_WIDTH} justify-end gap-4`}>
+      <div className="flex flex-col items-center gap-3 w-full px-4">
         <p className="text-xl sm:text-2xl font-semibold text-slate-800 dark:text-slate-100 tracking-tight leading-snug">
           {greeting}
         </p>
       </div>
 
-      <div className="flex flex-col items-stretch gap-1 w-full max-w-md">
+      <div className="flex flex-col items-stretch gap-1 w-full">
         {prompts.map((p, i) => {
           const Icon = PROMPT_ICONS[i % PROMPT_ICONS.length];
           return (
@@ -102,10 +107,10 @@ const ThreadWelcome: FC<{ greeting: string; prompts: ChatStarterPrompt[] }> = ({
               key={p.prompt}
               prompt={p.prompt}
               send
-              className="group flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-[15px] text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              className="group flex items-center gap-3 rounded-2xl px-4 py-2 text-left text-base text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
             >
-              <span className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full border border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 group-hover:border-blue-300 group-hover:text-blue-500 transition-colors">
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
+              <span className="shrink-0 flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-400 group-hover:border-blue-300 group-hover:text-blue-500 transition-colors">
+                <Icon className="w-4 h-4" strokeWidth={2.5} />
               </span>
               <span className="leading-snug">{p.label}</span>
             </ThreadPrimitive.Suggestion>
@@ -120,15 +125,15 @@ const ToolCallFallback: FC<{ toolName: string; status: { type: string } }> = ({
   toolName,
   status,
 }) => (
-  <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 px-4 py-3 my-2 text-[13.5px] text-slate-500 dark:text-slate-400">
-    <span className="font-medium text-slate-600 dark:text-slate-300">{toolName}</span>{" "}
+  <div className="rounded-2xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 px-4 py-3 my-2 text-sm text-slate-500 dark:text-slate-400">
+    <span className="font-semibold text-slate-600 dark:text-slate-300">{toolName}</span>{" "}
     {status.type === "running" ? "is running…" : `(${status.type})`}
   </div>
 );
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="flex justify-end">
-      <div className="max-w-[85%] rounded-[22px] bg-blue-50 dark:bg-blue-500/15 text-slate-800 dark:text-slate-100 px-4 py-3 text-[15px] leading-relaxed">
+      <div className="max-w-[85%] rounded-[22px] bg-blue-50 dark:bg-blue-500/15 text-slate-800 dark:text-slate-100 px-4 py-3 text-base leading-relaxed">
         <MessagePrimitive.Content />
       </div>
     </MessagePrimitive.Root>
@@ -138,7 +143,7 @@ const UserMessage: FC = () => {
 const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="group flex justify-start">
-      <div className="max-w-[92%] w-full text-slate-700 dark:text-slate-200 text-[15px] leading-[1.7]">
+      <div className="max-w-[92%] w-full text-slate-900 dark:text-slate-100 text-base leading-[1.7]">
         {/*
          * `reasoning` parts only exist when the branch node's model runs
          * on OpenAI's Responses API with `reasoning.summary` enabled (see

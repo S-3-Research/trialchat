@@ -62,8 +62,8 @@ const ToolCallCard: FC<{
       <div
         className={
           running
-            ? "shimmer text-foreground/60 text-[14px]"
-            : "text-[14px] text-slate-600 dark:text-slate-300"
+            ? "shimmer text-foreground/60 text-sm font-semibold"
+            : "text-sm font-semibold text-slate-600 dark:text-slate-300"
         }
       >
         {label}
@@ -179,7 +179,7 @@ export const GetTrialsToolUI: ToolCallMessagePartComponent<
 
   if (trials.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-3.5 my-2 text-[13.5px] text-slate-500 dark:text-slate-400">
+      <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-3.5 my-2 text-sm text-slate-500 dark:text-slate-400">
         No matching trials found for that search. Try broadening the location or
         conditions.
       </div>
@@ -258,7 +258,7 @@ export const WebSearchToolUI: ToolCallMessagePartComponent<
   if (!result?.count) return null;
 
   return (
-    <div className="text-[13px] text-slate-400 dark:text-slate-500 px-1 my-1.5">
+    <div className="text-xs text-slate-400 dark:text-slate-500 px-1 my-1.5">
       Searched the web · {result.count} source{result.count === 1 ? "" : "s"}
     </div>
   );
@@ -291,7 +291,7 @@ export const KnowledgeBaseToolUI: ToolCallMessagePartComponent<
   if (!result?.count) return null;
 
   return (
-    <div className="text-[13px] text-slate-400 dark:text-slate-500 px-1 my-1.5">
+    <div className="text-xs text-slate-400 dark:text-slate-500 px-1 my-1.5">
       Searched the knowledge base · {result.count} source
       {result.count === 1 ? "" : "s"}
     </div>
@@ -334,7 +334,7 @@ export const SuggestionsWidget: DataMessagePartComponent<{
           key={suggestion}
           type="button"
           onClick={() => aui.thread.append(suggestion)}
-          className="group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 -mx-2.5 text-left text-[14px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
+          className="group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 -mx-2.5 text-left text-base text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
         >
           <Sparkles
             className="w-4 h-4 shrink-0 text-slate-400 dark:text-slate-500 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors"

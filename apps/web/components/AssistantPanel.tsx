@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, ThreadListPrimitive } from "@assistant-ui/react";
 import {
   unstable_createLangGraphStream,
   useLangGraphRuntime,
   type LangChainMessage,
   type UIMessage,
 } from "@assistant-ui/react-langgraph";
-import { PanelLeft, X } from "lucide-react";
+import { PanelLeft, PanelLeftClose, Plus, X } from "lucide-react";
 import { createAgentClient, AGENT_ASSISTANT_ID } from "@/lib/agentClient";
 import { createThreadListAdapter } from "@/lib/threadListAdapter";
 import { getOrCreateGuestUserId } from "@/lib/guestId";
@@ -45,6 +45,10 @@ export function AssistantPanel() {
   const client = useMemo(() => createAgentClient(), []);
   const isMobile = useIsMobile();
   const [intakeData, setIntakeData] = useState<IntakeData | null>(null);
+  // Sidebar defaults to collapsed on both desktop and mobile — a slide-out
+  // panel toggled via the PanelLeft trigger (see the floating top-left
+  // controls below) rather than a permanently-docked column, so the chat
+  // surface gets the full panel width by default.
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -114,17 +118,43 @@ export function AssistantPanel() {
   });
 
   return (
-    <div className="relative flex flex-1 w-full h-full rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_80px_-20px_rgba(30,41,59,0.18)] dark:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.5)] transition-colors">
+    <div className="relative flex flex-1 w-full h-full mx-auto max-w-6xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
-        {/* Desktop: persistent sidebar */}
-        <div className="hidden md:flex md:w-64 md:shrink-0 flex-col border-r border-slate-200/70 dark:border-slate-700/60 p-3">
-          <ThreadListSidebar />
+        {/*
+         * Desktop: collapsible sidebar (default closed) that slides in/out
+         * by animating its own width, rather than being permanently
+         * docked — the inner column keeps a fixed w-64 so its content
+         * doesn't reflow/wrap mid-transition, only the outer wrapper's
+         * width (and thus how much of it is visible) animates.
+         */}
+        <div
+          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-in-out ${
+            sidebarOpen ? "md:w-64 border-r" : "md:w-0 border-r-0"
+          }`}
+        >
+          <div className="w-64 h-full flex flex-col p-4">
+            <div className="flex items-center justify-between mb-2 shrink-0">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Chats
+              </span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                aria-label="Collapse chat history"
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <ThreadListSidebar />
+            </div>
+          </div>
         </div>
 
-        {/* Mobile: drawer toggled by the panel-left button below */}
+        {/* Mobile: drawer toggled by the shared floating trigger below */}
         {isMobile && sidebarOpen && (
           <div className="absolute inset-0 z-30 flex">
-            <div className="w-72 max-w-[80%] h-full bg-white dark:bg-[#181D26] p-3 flex flex-col border-r border-slate-200/70 dark:border-slate-700/60">
+            <div className="w-72 max-w-[80%] h-full bg-white dark:bg-[#181D26] p-4 flex flex-col border-r border-slate-200/70 dark:border-slate-700/60">
               <div className="flex items-center justify-between mb-2 shrink-0">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Chats
@@ -157,14 +187,30 @@ export function AssistantPanel() {
         )}
 
         <div className="relative flex flex-1 min-w-0 flex-col">
-          {isMobile && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              aria-label="Open chat history"
-              className="absolute top-4 left-4 z-20 flex items-center justify-center w-9 h-9 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300"
-            >
-              <PanelLeft className="w-4 h-4" strokeWidth={2} />
-            </button>
+          {/*
+           * Shared floating controls — expand-sidebar + new-chat — shown
+           * whenever the sidebar is collapsed, on both desktop and mobile
+           * (previously this was mobile-only, leaving desktop users no way
+           * to reopen a fully-collapsed sidebar).
+           */}
+          {!sidebarOpen && (
+            <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+              <button
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open chat history"
+                className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              >
+                <PanelLeft className="w-4 h-4" strokeWidth={2} />
+              </button>
+              <ThreadListPrimitive.New asChild>
+                <button
+                  aria-label="New chat"
+                  className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  <Plus className="w-4 h-4" strokeWidth={2} />
+                </button>
+              </ThreadListPrimitive.New>
+            </div>
           )}
           <ChatSurface
             placeholder={PLACEHOLDER_INPUT}

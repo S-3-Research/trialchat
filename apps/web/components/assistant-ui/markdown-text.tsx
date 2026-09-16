@@ -48,7 +48,7 @@ const defaultComponents = memoizeMarkdownComponents({
   h3: ({ className, ...props }) => (
     <h3
       className={cx(
-        "mt-3 mb-1.5 scroll-m-20 text-[15px] font-semibold text-slate-800 dark:text-slate-100 first:mt-0",
+        "mt-3 mb-1.5 scroll-m-20 text-base font-semibold text-slate-800 dark:text-slate-100 first:mt-0",
         className,
       )}
       {...props}
@@ -114,7 +114,7 @@ const defaultComponents = memoizeMarkdownComponents({
     <div className="mb-3 overflow-x-auto last:mb-0">
       <table
         className={cx(
-          "w-full border-collapse text-[13.5px]",
+          "w-full border-collapse text-sm",
           className,
         )}
         {...props}
@@ -142,7 +142,7 @@ const defaultComponents = memoizeMarkdownComponents({
   code: ({ className, ...props }) => (
     <code
       className={cx(
-        "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+        "rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200",
         className,
       )}
       {...props}
@@ -151,7 +151,7 @@ const defaultComponents = memoizeMarkdownComponents({
   pre: ({ className, ...props }) => (
     <pre
       className={cx(
-        "mb-3 overflow-x-auto rounded-xl bg-slate-900 p-3 text-[13px] text-slate-100 last:mb-0",
+        "mb-3 overflow-x-auto rounded-xl bg-slate-900 p-3 text-xs text-slate-100 last:mb-0",
         className,
       )}
       {...props}

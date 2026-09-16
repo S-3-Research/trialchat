@@ -44,7 +44,7 @@ export function ChatSurface({
       <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
         <button
           onClick={() => (isClinician ? setShowClinicianModal(true) : setShowMatchModal(true))}
-          className="flex items-center justify-center gap-2 h-11 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-[0_8px_24px_-6px_rgba(37,99,235,0.35)] hover:shadow-[0_10px_28px_-6px_rgba(37,99,235,0.45)] transition-shadow focus:outline-none select-none"
+          className="flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
           aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
         >
           <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />

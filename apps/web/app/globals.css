@@ -258,10 +258,42 @@ body {
   }
   .chat-scroll::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
+
   }
   .chat-scroll {
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  }
+
+  /*
+   * Subtle, track-less scrollbar for compact chrome like the thread-list
+   * sidebar — thinner than `.custom-scrollbar` and the thumb is fully
+   * transparent until hovered, so the sidebar reads as scrollbar-free at
+   * rest instead of showing a persistent thin gray line.
+   */
+  .sidebar-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .sidebar-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+  }
+  .sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+  }
+  .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.6);
+  }
+  /* Firefox */
+  .sidebar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .sidebar-scrollbar:hover {
+    scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
   }
 }
 

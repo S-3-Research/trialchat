@@ -43,9 +43,9 @@ export function ReasoningPanel({
       data-slot="reasoning-panel"
       open={open}
       onOpenChange={onOpenChange}
-      className={cn("w-full max-w-sm", className)}
+      className={cn("w-full max-w-sm mb-3", className)}
     >
-      <CollapsibleTrigger className="group/trigger text-foreground/55 hover:text-foreground/90 flex items-center gap-1.5 py-1 text-[13.5px] transition-[color,scale] outline-none active:scale-[0.98]">
+      <CollapsibleTrigger className="group/trigger text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-slate-100 flex items-center gap-1.5 py-1 text-sm font-semibold transition-[color,scale] outline-none active:scale-[0.98]">
         <SwapLabel active={streaming ? 0 : 1} className="text-start">
           <>
             <ShimmerLabel
@@ -83,10 +83,10 @@ export function ReasoningPanel({
                   )}
                 />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <p className="text-foreground/90 text-[13.5px] font-medium">
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">
                     {step.title}
                   </p>
-                  <p className="text-foreground/50 mt-0.5 text-[13px] leading-relaxed break-words">
+                  <p className="text-xs mt-0.5 leading-relaxed break-words text-slate-500 dark:text-slate-400">
                     {step.body}
                   </p>
                 </span>
