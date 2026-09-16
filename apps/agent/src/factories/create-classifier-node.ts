@@ -24,34 +24,37 @@ export function createClassifierNode<TLabel extends string>(
     label: z.enum(config.labels),
   });
 
+  // The LangGraph API server's `messages` streamMode handler only
+  // suppresses a chat-model call's token chunks when the *literal* tag
+  // "nostream" is present on the run (see `on_chat_model_stream` handling
+  // in `@langchain/langgraph-api`'s stream.mjs: `!event.tags?.includes(
+  // "nostream")`). "langsmith:nostream" (the LangSmith trace-hiding
+  // convention) is a *different* string and does not match this check —
+  // that's why this classifier's raw JSON output kept leaking into the
+  // chat UI as streamed text despite being tagged that way before. Bind
+  // the correct tag at model-construction time via `withConfig` so it's
+  // present on every underlying `on_chat_model_stream` event this model
+  // emits, regardless of what's merged into `runConfig` per-invoke.
   const model = new ChatOpenAI(
     modelParams(config.model ?? "gpt-4o-mini", config.temperature ?? 0)
-  ).withStructuredOutput(schema, { name: "classify" });
+  )
+    .withStructuredOutput(schema, { name: "classify" })
+    .withConfig({ tags: ["nostream"] });
 
   return async function classifierNode(
     state: AgentStateType,
     runConfig: LangGraphRunnableConfig
   ) {
-    // Tagged "langsmith:nostream" so this internal classification call's
-    // tokens are excluded from `streamMode: "messages"` — it never writes
-    // to `state.messages`, so there's nothing user-facing to stream anyway,
-    // but without the tag LangGraph still forwards its raw token chunks to
-    // the frontend, which briefly flashes as assistant text. Merged into
-    // (not replacing) the node's real `runConfig` — passing a bare
-    // `{ tags: [...] }` literal drops the callbacks/metadata LangGraph
-    // attaches to this run, which is what actually let the tag reach the
-    // `StreamMessagesHandler` that decides whether to emit tokens.
     const result = await model.invoke(
       [
         { role: "system", content: config.systemPrompt },
         ...state.messages,
       ],
-      {
-        ...runConfig,
-        tags: [...(runConfig.tags ?? []), "langsmith:nostream"],
-      }
+      runConfig
     );
 
+    // Only ever writes to `state[stateKey]` (e.g. `state.intent`), never to
+    // `state.messages` — nothing here is meant to render as chat text.
     return { [config.stateKey]: result.label };
   };
 }

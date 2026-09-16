@@ -28,29 +28,31 @@ const schema = z.object({
   suggestions: z.array(z.string()).max(suggestionsConfig.maxSuggestions),
 });
 
+// The LangGraph API server only suppresses a chat-model call's streamed
+// token chunks when the literal tag "nostream" is present (see
+// `@langchain/langgraph-api`'s stream.mjs: `on_chat_model_stream` handler
+// checks `!event.tags?.includes("nostream")`) — "langsmith:nostream" (the
+// LangSmith trace-hiding convention) is a different string and does not
+// match, which is why this node's raw JSON output previously leaked into
+// the chat UI as streamed text. `withConfig` binds the tag at
+// model-construction time so it's present on every underlying
+// `on_chat_model_stream` event this model emits.
 const model = new ChatOpenAI(
   modelParams(suggestionsConfig.model, suggestionsConfig.temperature)
-).withStructuredOutput(schema, { name: "suggestions" });
+)
+  .withStructuredOutput(schema, { name: "suggestions" })
+  .withConfig({ tags: ["nostream"] });
 
 export async function suggestionsAgent(
   state: AgentStateType,
   config: LangGraphRunnableConfig
 ) {
-  // Tagged "langsmith:nostream" for the same reason as the classifier node
-  // (see create-classifier-node.ts) — this call's output is pushed as a
-  // structured UI message below, not streamed as chat text. Merged into
-  // (not replacing) `config` so callbacks/metadata LangGraph attaches to
-  // this run are preserved — a bare `{ tags: [...] }` literal drops them,
-  // which is why the tag wasn't actually suppressing the stream before.
   const result = await model.invoke(
     [
       { role: "system", content: suggestionsConfig.systemPrompt },
       ...state.messages,
     ],
-    {
-      ...config,
-      tags: [...(config.tags ?? []), "langsmith:nostream"],
-    }
+    config
   );
 
   // The branch node (knowledge / api_agent / other_questions) always ends
