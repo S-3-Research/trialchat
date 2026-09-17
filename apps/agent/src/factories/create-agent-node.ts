@@ -37,6 +37,12 @@ export type AgentNodeConfig = {
   // instead of re-invoking. Omit for no per-tool cap (still bounded by
   // MAX_TOOL_ITERATIONS overall).
   maxCallsPerTool?: number;
+  // When true, splice `state.activeTrialSearch` (if present) in as a
+  // system-role context message ahead of the conversation history — see
+  // the doc comment on that field in state.ts. Only `api-agent.config.ts`
+  // sets this today; the knowledge/other-questions branches have no use
+  // for trial-search context and skip the extra tokens entirely.
+  includeActiveTrialSearchContext?: boolean;
 };
 
 const MAX_TOOL_ITERATIONS = 4;
@@ -71,10 +77,28 @@ export function createAgentNode(config: AgentNodeConfig) {
   const toolsByName = new Map(langChainTools.map((t) => [t.name, t]));
 
   return async function agentNode(state: AgentStateType) {
-    const messages = [
+    const messages: Array<{ role: "system"; content: string } | AgentStateType["messages"][number]> = [
       { role: "system" as const, content: config.prompt },
-      ...state.messages,
     ];
+
+    // Full-fidelity trial-search context (see state.ts's doc comment on
+    // `activeTrialSearch`): spliced in as a *local* variable only, right
+    // before this invoke's `state.messages` — never returned from this
+    // function, so it never gets appended to the persisted message
+    // history. Each turn re-reads whatever the web app most recently
+    // staged, so a long session doesn't accumulate N stale snapshots; it
+    // always sees exactly one, the current one (or none, if the user
+    // hasn't searched yet).
+    if (config.includeActiveTrialSearchContext && state.activeTrialSearch) {
+      messages.push({
+        role: "system" as const,
+        content:
+          "Current active trial search (from the user's Trial Panel, may have been changed directly in the panel without a chat message — treat this as ground truth for 'this search'/'these results'/'this trial'):\n" +
+          JSON.stringify(state.activeTrialSearch, null, 2),
+      });
+    }
+
+    messages.push(...state.messages);
 
     let response = (await model.invoke(messages)) as AIMessage;
     const newMessages: (AIMessage | ToolMessage)[] = [response];

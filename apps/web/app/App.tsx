@@ -311,7 +311,7 @@ export default function App({ skipIntake = false, autoOpenMatch = false }: AppPr
         </svg>
       </button> */}
 
-      <div className="main-layout-container mx-auto w-[95%] max-w-6xl flex-1 flex flex-col py-6 pb-10 transition-all duration-300 ease-in-out">
+      <div className="main-layout-container mx-auto w-[95%] max-w-7xl flex-1 flex flex-col py-6 pb-10 transition-all duration-300 ease-in-out">
         {/* Panels Container */}
         <div className="flex gap-4 flex-1">
             <div className="flex-1 flex flex-col">

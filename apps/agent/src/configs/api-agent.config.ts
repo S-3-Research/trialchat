@@ -12,4 +12,5 @@ export const apiAgentConfig = {
   tools: toolPresets.trialMatching,
   activityLabel: "Finding matching trials",
   maxCallsPerTool: 1,
+  includeActiveTrialSearchContext: true,
 };

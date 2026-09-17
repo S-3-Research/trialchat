@@ -23,6 +23,7 @@ import {
 import type { ChatStarterPrompt } from "@/lib/types/prompts";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI, ThinkingAccordion, ThinkingDots, ThreadThinkingIndicator } from "@/components/assistant-ui/tool-ui";
+import { useTrialSearch } from "@/contexts/TrialSearchContext";
 
 /**
  * Thread UI built from native assistant-ui primitives, styled to match the
@@ -225,14 +226,55 @@ const AssistantMessage: FC = () => {
 };
 
 const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
+  const { search, toggleTrialSelection, markTrialAsked } = useTrialSearch();
+  const scopedTrials = (search.selectedTrialIds ?? [])
+    .map((id) => search.results.find((t) => t.id === id))
+    .filter((t): t is NonNullable<typeof t> => Boolean(t));
+
+  // Sending a message while trials are pinned (blue "Re:" pills) scopes
+  // the question to them just as much as a preset "Ask TrialChat" send
+  // does — so they should get the same green "being asked" pulse (and the
+  // rest of the panel should dim/lock for the run) even though this send
+  // went through the composer, not the dropdown. `ComposerPrimitive.Root`
+  // composes this `onSubmit` with its own internal submit handler (fires
+  // first, see ComposerRoot.js), so this runs on both Enter-to-send and
+  // clicking the Send button, right before the actual send() call.
+  const markScopedTrialsAsked = () => {
+    scopedTrials.forEach((t) => t.id && markTrialAsked(t.id));
+  };
+
   return (
-    <ComposerPrimitive.Root className="flex flex-col gap-1.5 rounded-[26px] border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 px-3 py-2.5 shadow-[0_12px_32px_-8px_rgba(30,41,59,0.12)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.4)]">
+    <ComposerPrimitive.Root
+      onSubmit={markScopedTrialsAsked}
+      className="flex flex-col gap-1.5 rounded-[26px] border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 px-3 py-2.5 shadow-[0_12px_32px_-8px_rgba(30,41,59,0.12)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.4)]">
+      {scopedTrials.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap px-2 pt-0.5 pb-1">
+          {scopedTrials.map((trial) => (
+            <span
+              key={trial.id}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 rounded-full pl-2.5 pr-1.5 py-1 max-w-full"
+            >
+              <span className="truncate">
+                Re: {trial.title ?? trial.id}
+              </span>
+              <button
+                type="button"
+                aria-label="Clear trial scope"
+                onClick={() => trial.id && toggleTrialSelection(trial.id)}
+                className="shrink-0 rounded-full p-0.5 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+              >
+                <span className="block w-3 h-3 leading-none text-center text-sm">×</span>
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
       <AuiIf condition={(s) => s.composer.dictation != null}>
         <ComposerPrimitive.DictationTranscript className="px-2 text-[13px] text-blue-500 dark:text-blue-400 italic" />
       </AuiIf>
       <div className="flex items-end gap-2">
         <ComposerPrimitive.Input
-          placeholder={placeholder}
+          placeholder={scopedTrials.length > 0 ? "Ask about this trial..." : placeholder}
           rows={1}
           className="flex-1 resize-none bg-transparent outline-none text-[15px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 max-h-40 px-2 py-2"
         />

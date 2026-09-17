@@ -15,6 +15,13 @@ import { getOrCreateGuestUserId } from "@/lib/guestId";
 import { ChatSurface } from "@/components/assistant-ui/ChatSurface";
 import { ThreadListSidebar } from "@/components/assistant-ui/ThreadListSidebar";
 import { SuggestionsWidget } from "@/components/assistant-ui/tool-ui";
+import { TrialSearchChatBridge } from "@/components/assistant-ui/TrialSearchChatBridge";
+import {
+  TrialPanel,
+  TrialPanelTrigger,
+  TRIAL_PANEL_WIDTH_PERCENT,
+} from "@/components/assistant-ui/TrialPanel";
+import { TrialSearchProvider, useTrialSearch } from "@/contexts/TrialSearchContext";
 import {
   PLACEHOLDER_INPUT,
   getGreetingForUser,
@@ -42,6 +49,14 @@ import {
  * extra wiring is needed here.
  */
 export function AssistantPanel() {
+  return (
+    <TrialSearchProvider>
+      <AssistantPanelInner />
+    </TrialSearchProvider>
+  );
+}
+
+function AssistantPanelInner() {
   const client = useMemo(() => createAgentClient(), []);
   const isMobile = useIsMobile();
   const [intakeData, setIntakeData] = useState<IntakeData | null>(null);
@@ -50,6 +65,7 @@ export function AssistantPanel() {
   // controls below) rather than a permanently-docked column, so the chat
   // surface gets the full panel width by default.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { panelOpen: trialPanelOpen, closePanel: closeTrialPanel } = useTrialSearch();
 
   useEffect(() => {
     const stored = window.localStorage.getItem(INTAKE_STORAGE_KEY);
@@ -118,7 +134,7 @@ export function AssistantPanel() {
   });
 
   return (
-    <div className="relative flex flex-1 w-full h-full mx-auto max-w-6xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
+    <div className="relative flex flex-1 w-full h-full mx-auto max-w-7xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
         {/*
          * Desktop: collapsible sidebar (default closed) that slides in/out
@@ -218,7 +234,38 @@ export function AssistantPanel() {
             prompts={prompts}
             intakeData={intakeData}
           />
+          <TrialPanelTrigger />
         </div>
+
+        {/*
+         * Right-side Trial Panel — persistent structured view of the
+         * active trial search (see contexts/TrialSearchContext.tsx). On
+         * desktop it docks alongside chat, animating width like the left
+         * sidebar; on mobile it becomes a full-height sheet so chat never
+         * has to share horizontal space with it.
+         */}
+        <div
+          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-in-out ${
+            trialPanelOpen ? "border-l" : "border-l-0"
+          }`}
+          style={{ width: trialPanelOpen ? `${TRIAL_PANEL_WIDTH_PERCENT}%` : 0 }}
+        >
+          <TrialPanel />
+        </div>
+
+        {isMobile && trialPanelOpen && (
+          <div className="absolute inset-0 z-30 flex justify-end">
+            <div className="flex-1 bg-black/30" onClick={closeTrialPanel} />
+            <div
+              className="h-full bg-white dark:bg-[#181D26] border-l border-slate-200/70 dark:border-slate-700/60"
+              style={{ width: `min(${TRIAL_PANEL_WIDTH_PERCENT}%, 92%)` }}
+            >
+              <TrialPanel />
+            </div>
+          </div>
+        )}
+
+        <TrialSearchChatBridge />
       </AssistantRuntimeProvider>
     </div>
   );

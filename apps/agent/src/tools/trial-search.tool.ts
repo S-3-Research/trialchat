@@ -154,6 +154,12 @@ type RawMatchedLocation = {
   };
 };
 
+type RawMatchReport = {
+  result: boolean;
+  filter_type: string;
+  result_text: string;
+};
+
 type RawMatchedTrial = {
   clinical_trial?: {
     id?: string;
@@ -162,8 +168,13 @@ type RawMatchedTrial = {
     conditions?: string[];
     phases?: string[];
     intervention_types?: string[];
+    eligibility_summary?: string;
+    min_age?: number;
+    max_age?: number;
+    links?: string[];
   };
   matched_locations?: RawMatchedLocation[];
+  reports?: RawMatchReport[];
   rank?: number;
 };
 
@@ -186,8 +197,33 @@ function flattenTrial(raw: RawMatchedTrial) {
     conditions: ct.conditions,
     phases: ct.phases,
     intervention_types: ct.intervention_types,
+    eligibility_summary: ct.eligibility_summary,
+    min_age: ct.min_age,
+    max_age: ct.max_age,
+    links: ct.links,
     locations,
+    reports: raw.reports,
     rank: raw.rank,
+  };
+}
+
+/**
+ * The external API embeds the true total count/page count in
+ * `summary_report`'s free text (e.g. "...total 27 matched trial in our
+ * database, total 6 pages.") rather than a structured field — parse it
+ * out so the web app's Trial Panel can show an accurate count. See the
+ * mirrored parser in apps/web/app/api/trial-search/route.ts.
+ */
+function parseTotalsFromSummary(summary: string | undefined): {
+  total?: number;
+  totalPages?: number;
+} {
+  if (!summary) return {};
+  const totalMatch = summary.match(/total\s+(\d+)\s+matched trial/i);
+  const pagesMatch = summary.match(/total\s+(\d+)\s+pages?/i);
+  return {
+    total: totalMatch ? Number(totalMatch[1]) : undefined,
+    totalPages: pagesMatch ? Number(pagesMatch[1]) : undefined,
   };
 }
 
@@ -226,11 +262,15 @@ async function searchTrials(args: TrialSearchArgs) {
       summary_report?: string;
     };
     const matchedTrials = (data.matched_trial ?? []).map(flattenTrial);
+    const { total, totalPages } = parseTotalsFromSummary(data.summary_report);
 
     return {
       success: true,
       count: matchedTrials.length,
       trials: matchedTrials,
+      total,
+      totalPages,
+      page: args.page ?? 1,
       summary:
         data.summary_report ?? `Found ${matchedTrials.length} matching trials`,
     };

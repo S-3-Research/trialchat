@@ -4,6 +4,7 @@ import {
   type UIMessage,
   type RemoveUIMessage,
 } from "@langchain/langgraph-sdk/react-ui/server";
+import type { ActiveTrialSearchContext } from "./types/active-trial-search.js";
 
 export type Intent = "knowledge" | "trial_matching" | "other";
 
@@ -59,6 +60,21 @@ export const AgentState = Annotation.Root({
   // result for downstream nodes (e.g. `suggestions`) without re-parsing it
   // out of `messages`.
   trialResults: Annotation<unknown[] | undefined>({
+    reducer: (_left, right) => right,
+    default: () => undefined,
+  }),
+  // Staged by the web app via `useLangGraphSetState` whenever the shared
+  // Trial Panel state (contexts/TrialSearchContext.tsx) changes — see
+  // TrialSearchChatBridge.tsx. Last-write-wins: each run only cares about
+  // the *current* search, not a history of past values, so unlike
+  // `messages` this never accumulates across turns. Read by
+  // `createAgentNode` (factories/create-agent-node.ts) and spliced into
+  // the model's input as a context message when
+  // `config.includeActiveTrialSearchContext` is set, without ever being
+  // written back into `state.messages` — so it can carry the *full*
+  // criteria/results/selected-trial payload every turn without the
+  // conversation's persisted message history growing.
+  activeTrialSearch: Annotation<ActiveTrialSearchContext | undefined>({
     reducer: (_left, right) => right,
     default: () => undefined,
   }),

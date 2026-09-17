@@ -5,7 +5,7 @@ import docsData from "@/data/docs.json";
 export default function DocsPage() {
   return (
     <div className="h-full w-full overflow-y-auto custom-scrollbar scroll-mask">
-      <div className="mx-auto max-w-6xl px-6 py-12">
+      <div className="mx-auto max-w-7xl px-6 py-12">
         {/* Header */}
         <div className="mb-10">
           <Link

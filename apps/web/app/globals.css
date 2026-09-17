@@ -383,6 +383,25 @@ body {
   border-radius: 9999px;
 }
 
+/* Trial Panel — "being asked about" card border pulse (green), used while
+   a chat run is scoped to a specific trial (see TrialPanel.tsx's `asked`
+   prop). Animates border-color rather than a static ring so the card
+   reads as "actively working on this" rather than just "selected". */
+@keyframes trial-border-pulse {
+  0%, 100% {
+    border-color: rgba(16, 185, 129, 0.9);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  }
+  50% {
+    border-color: rgba(16, 185, 129, 0.45);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0);
+  }
+}
+
+.animate-trial-border-pulse {
+  animation: trial-border-pulse 1.6s ease-in-out infinite;
+}
+
 /*
  ---break---
  */
