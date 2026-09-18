@@ -85,6 +85,9 @@ export type ActiveTrialSearchPagination = {
  * unbounded growth across turns).
  */
 export type ActiveTrialSearchContext = {
+  lastAppliedToolCallId?: string;
+  selectedTrialIds?: string[];
+  updatedAt?: string;
   criteria: ActiveTrialSearchCriteria;
   sort?: "relevance" | "distance";
   pagination: ActiveTrialSearchPagination;

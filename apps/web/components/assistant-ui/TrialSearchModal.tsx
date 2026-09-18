@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTrialSearch } from "@/contexts/TrialSearchContext";
-import type { TrialSearchCriteria } from "@/lib/types/trialSearch";
+import type { TrialSearchCriteria, TrialSearchSort } from "@/lib/types/trialSearch";
 
 /**
  * Shared modal for both "New search" and "Refine filters" in the Trial
@@ -13,7 +13,7 @@ import type { TrialSearchCriteria } from "@/lib/types/trialSearch";
  * `mode="new"` always creates a new search identity via
  * `startNewTrialSearch` (spec section 2/8) with a fresh, mostly-blank
  * form. `mode="refine"` patches the *current* active search via
- * `updateTrialSearch`/`updateTrialSearchSort` and pre-fills from the
+ * `updateTrialSearch` (criteria and sort together) and pre-fills from the
  * existing criteria. Both bypass the LLM entirely (spec section 5/10).
  */
 
@@ -24,6 +24,10 @@ const SEX_OPTIONS = [
   { value: "female", label: "Female" },
 ] as const;
 
+/** Bounds for the age-range dual slider — matches typical trial eligibility spans. */
+const AGE_MIN = 0;
+const AGE_MAX = 120;
+
 export function TrialSearchModal({
   mode,
   onClose,
@@ -31,7 +35,7 @@ export function TrialSearchModal({
   mode: "new" | "refine";
   onClose: () => void;
 }) {
-  const { search, startNewTrialSearch, updateTrialSearch, updateTrialSearchSort } =
+  const { search, startNewTrialSearch, updateTrialSearch } =
     useTrialSearch();
   const c = mode === "refine" ? search.criteria : {};
 
@@ -40,14 +44,29 @@ export function TrialSearchModal({
   const [state, setState] = useState(c.state ?? "");
   const [radius, setRadius] = useState(c.pref_distance?.toString() ?? "");
   const [sex, setSex] = useState<TrialSearchCriteria["sex"]>(c.sex ?? "all");
-  const [minAge, setMinAge] = useState(c.min_age?.toString() ?? "");
-  const [maxAge, setMaxAge] = useState(c.max_age?.toString() ?? "");
+  // Age: mutually exclusive "exact age" vs "age range" — the trial-search
+  // API only understands `age` XOR `min_age`/`max_age`, so the form must
+  // never send both at once. Whichever one the existing criteria already
+  // used (on refine) decides the initial mode; "range" is the default for
+  // a brand-new search since it's the more common case.
+  const [ageMode, setAgeMode] = useState<"range" | "exact">(
+    c.age !== undefined ? "exact" : "range"
+  );
+  const [exactAge, setExactAge] = useState(c.age?.toString() ?? "");
+  const [minAge, setMinAge] = useState(c.min_age ?? AGE_MIN);
+  const [maxAge, setMaxAge] = useState(c.max_age ?? AGE_MAX);
   const [recruiting, setRecruiting] = useState(c.recruitingStatus ?? "all");
   const [phases, setPhases] = useState<string[]>(c.phases ?? []);
-  const [sort, setSort] = useState(search.sort ?? "relevance");
+  const [sort, setSort] = useState<TrialSearchSort>(search.sort ?? "relevance");
 
   const togglePhase = (p: string) =>
     setPhases((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+
+  // Dragging the "min" thumb past "max" (or vice versa) clamps against
+  // the other handle instead of crossing over it — a plain pair of
+  // number inputs would otherwise happily accept an inverted range.
+  const handleMinAgeChange = (value: number) => setMinAge(Math.min(value, maxAge));
+  const handleMaxAgeChange = (value: number) => setMaxAge(Math.max(value, minAge));
 
   const criteria: TrialSearchCriteria = {
     conditions: conditions
@@ -57,8 +76,11 @@ export function TrialSearchModal({
     state: state || undefined,
     pref_distance: radius ? Number(radius) : undefined,
     sex,
-    min_age: minAge ? Number(minAge) : undefined,
-    max_age: maxAge ? Number(maxAge) : undefined,
+    age: ageMode === "exact" && exactAge ? Number(exactAge) : undefined,
+    min_age:
+      ageMode === "range" && (minAge > AGE_MIN || maxAge < AGE_MAX) ? minAge : undefined,
+    max_age:
+      ageMode === "range" && (minAge > AGE_MIN || maxAge < AGE_MAX) ? maxAge : undefined,
     recruitingStatus: recruiting === "recruiting" ? "recruiting" : "all",
     phases: phases.length ? phases : undefined,
   };
@@ -67,12 +89,9 @@ export function TrialSearchModal({
 
   const handleSubmit = () => {
     if (mode === "new") {
-      startNewTrialSearch(criteria, "panel");
+      startNewTrialSearch(criteria, "panel", sort);
     } else {
-      updateTrialSearch(criteria, "panel");
-      if (sort !== (search.sort ?? "relevance")) {
-        updateTrialSearchSort(sort as "relevance" | "distance");
-      }
+      updateTrialSearch(criteria, "panel", sort);
     }
     onClose();
   };
@@ -211,29 +230,87 @@ export function TrialSearchModal({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                    Min age
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Age
                   </label>
+                  {/* Exact age vs age range are mutually exclusive on the
+                      backend (see `criteria` above) — a small segmented
+                      toggle instead of showing three inputs at once. */}
+                  <div className="flex rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden text-[11px] font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setAgeMode("range")}
+                      className={`px-2.5 py-1 transition-colors ${
+                        ageMode === "range"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : "bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+                      }`}
+                    >
+                      Range
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAgeMode("exact")}
+                      className={`px-2.5 py-1 transition-colors border-l border-slate-200 dark:border-slate-700 ${
+                        ageMode === "exact"
+                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                          : "bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+                      }`}
+                    >
+                      Exact
+                    </button>
+                  </div>
+                </div>
+
+                {ageMode === "exact" ? (
                   <input
                     type="number"
-                    value={minAge}
-                    onChange={(e) => setMinAge(e.target.value)}
+                    min={AGE_MIN}
+                    max={AGE_MAX}
+                    value={exactAge}
+                    onChange={(e) => setExactAge(e.target.value)}
+                    placeholder="e.g. 65"
                     className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/30 transition-all"
                   />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                    Max age
-                  </label>
-                  <input
-                    type="number"
-                    value={maxAge}
-                    onChange={(e) => setMaxAge(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-500/30 transition-all"
-                  />
-                </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 px-4 pt-3 pb-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2 tabular-nums">
+                      <span>{minAge}{minAge === AGE_MIN ? "" : " yrs"}</span>
+                      <span>
+                        {maxAge >= AGE_MAX ? `${AGE_MAX}+` : maxAge} yrs
+                      </span>
+                    </div>
+                    <div className="dual-range-slider">
+                      {/* Static track + filled segment between the two thumbs, drawn separately from the (transparent-track) range inputs above it. */}
+                      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-slate-200 dark:bg-slate-700" />
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 h-1 rounded-full bg-blue-500"
+                        style={{
+                          left: `${((minAge - AGE_MIN) / (AGE_MAX - AGE_MIN)) * 100}%`,
+                          right: `${100 - ((maxAge - AGE_MIN) / (AGE_MAX - AGE_MIN)) * 100}%`,
+                        }}
+                      />
+                      <input
+                        type="range"
+                        min={AGE_MIN}
+                        max={AGE_MAX}
+                        value={minAge}
+                        onChange={(e) => handleMinAgeChange(Number(e.target.value))}
+                        aria-label="Minimum age"
+                      />
+                      <input
+                        type="range"
+                        min={AGE_MIN}
+                        max={AGE_MAX}
+                        value={maxAge}
+                        onChange={(e) => handleMaxAgeChange(Number(e.target.value))}
+                        aria-label="Maximum age"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

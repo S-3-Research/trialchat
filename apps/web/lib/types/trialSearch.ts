@@ -81,6 +81,8 @@ export type TrialSearchPagination = {
 };
 
 export type TrialSearchState = {
+  /** Last chat tool result already incorporated into this snapshot. */
+  lastAppliedToolCallId?: string;
   id: string;
   query?: string;
   criteria: TrialSearchCriteria;
@@ -133,4 +135,94 @@ export function createIdleTrialSearch(): TrialSearchState {
 
 export function createSearchId(): string {
   return `search_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Thread-scoped persistence shape for the Trial Panel's active search.
+ *
+ * Written directly into the LangGraph thread's checkpoint (via
+ * `client.threads.updateState(threadId, { values: { activeTrialSearch } })`
+ * — see contexts/TrialSearchContext.tsx's `persistenceAdapter` prop) so it
+ * survives thread switches/reloads without depending on a chat turn ever
+ * running. Deliberately excludes:
+ *   - `id` — regenerated on restore; it's just an internal React key, not
+ *     meaningful across sessions.
+ *   - `askedTrialIds` — run-scoped "being asked about" pulse state, never
+ *     meaningful to persist.
+ *   - `error` — a stale error from a prior session shouldn't resurface.
+ *
+ * Chat stages this same complete payload for each run. Model-only trimming
+ * happens inside the agent, so a run cannot erase the Panel's result list.
+ */
+export type PersistedTrialSearch = {
+  lastAppliedToolCallId?: string;
+  criteria: TrialSearchCriteria;
+  sort?: TrialSearchSort;
+  results: Trial[];
+  pagination: TrialSearchPagination;
+  selectedTrialIds?: string[];
+  status: TrialSearchStatus;
+  updatedAt?: string;
+};
+
+export function toPersistedTrialSearch(search: TrialSearchState): PersistedTrialSearch {
+  return {
+    lastAppliedToolCallId: search.lastAppliedToolCallId,
+    criteria: search.criteria,
+    sort: search.sort,
+    results: search.results,
+    pagination: search.pagination,
+    selectedTrialIds: search.selectedTrialIds,
+    status: search.status,
+    updatedAt: search.updatedAt,
+  };
+}
+
+/**
+ * Restores a `TrialSearchState` from a persisted (or bridge-written)
+ * payload. Tolerant of the bridge's alternate shape (`selectedTrials` as
+ * full `Trial[]` instead of `selectedTrialIds`) since both writers share
+ * the same graph-state key. A search that was mid-flight when the
+ * checkpoint was written (`status: "searching" | "loading-more"`) is
+ * coerced to `"success"` (if it has results) or the idle state (if not) —
+ * restoring a thread should never resurrect a spinner nothing is driving.
+ */
+export function fromPersistedTrialSearch(
+  raw:
+    | (Partial<PersistedTrialSearch> & {
+        selectedTrials?: Array<{ id?: string }>;
+      })
+    | undefined
+): TrialSearchState {
+  if (!raw || !raw.criteria) return createIdleTrialSearch();
+
+  const selectedTrialIds =
+    raw.selectedTrialIds ??
+    raw.selectedTrials?.map((t) => t.id).filter((id): id is string => Boolean(id));
+
+  const hasResults = Boolean(raw.results?.length);
+  const status: TrialSearchStatus =
+    raw.status === "searching" || raw.status === "loading-more"
+      ? hasResults
+        ? "success"
+        : "idle"
+      : raw.status ?? (hasResults ? "success" : "idle");
+
+  return {
+    id: createSearchId(),
+    lastAppliedToolCallId: raw.lastAppliedToolCallId,
+    criteria: raw.criteria,
+    sort: raw.sort,
+    results: raw.results ?? [],
+    pagination:
+      raw.pagination ?? {
+        page: 1,
+        pageSize: DEFAULT_PAGE_SIZE,
+        total: raw.results?.length ?? 0,
+        hasNextPage: false,
+      },
+    selectedTrialIds: selectedTrialIds?.length ? selectedTrialIds : undefined,
+    status,
+    updatedAt: raw.updatedAt,
+  };
 }

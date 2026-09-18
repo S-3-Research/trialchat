@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useAuiState } from "@assistant-ui/react";
+import { useAui, useAuiState } from "@assistant-ui/react";
 import { useLangGraphSetState } from "@assistant-ui/react-langgraph";
 import { useTrialSearch } from "@/contexts/TrialSearchContext";
-import type { Trial, TrialSearchCriteria } from "@/lib/types/trialSearch";
+import { toPersistedTrialSearch, type Trial, type TrialSearchCriteria } from "@/lib/types/trialSearch";
 
 /**
  * Bridges the Chat path into the shared Search Controller
@@ -85,10 +85,54 @@ function isRefinementOf(
 
 export function TrialSearchChatBridge() {
   const messages = useAuiState((s) => s.thread.messages);
-  const { search, ingestChatToolResult } = useTrialSearch();
+  const { search, threadKey, isHydrating, ingestChatToolResult } = useTrialSearch();
+  const aui = useAui();
   const processedRef = useRef<Set<string>>(new Set());
   const searchRef = useRef(search);
   searchRef.current = search;
+
+  // assistant-ui flips `threadListItem.id` to the new thread the instant
+  // `switchToThread` resolves — well BEFORE TrialThreadSync's own
+  // `getState` round-trip finishes and `threadKey`/`search` (both from
+  // TrialSearchContext) catch up to that same thread. During that gap,
+  // `search` still holds the OLD thread's data while `aui.threadListItem`
+  // already points at the NEW one. Both effects below act on `search` in
+  // ways that get attributed to "whichever thread `aui` currently thinks
+  // is active" (via `aui.threadListItem.updateCustom` and the LangGraph
+  // run's shared state), so without this check either could momentarily
+  // write the OLD thread's numbers/context onto the NEW thread.
+  const activeAuiThreadId = useAuiState((s) => s.optional.threadListItem?.id);
+  const isSearchStale = activeAuiThreadId !== undefined && activeAuiThreadId !== threadKey;
+
+  // Keeps the sidebar's per-thread trial-count badge
+  // (lib/threadListAdapter.ts's `extractTrialCount`, read into
+  // `custom.trialCount`) live. That adapter only computes the badge once,
+  // from whatever `values.activeTrialSearch` the LangGraph checkpoint had
+  // at `list()`/`fetch()` time — it's never re-derived after a Panel edit
+  // or a new Chat-driven search, since both of those write straight to the
+  // thread's checkpoint via a path that bypasses assistant-ui's own
+  // RemoteThreadList store entirely. Pushing it here, through the actual
+  // thread-list-item runtime (`updateCustom`), is what makes the sidebar
+  // badge reflect the *current* result count instead of whatever it
+  // happened to be when the sidebar last called list()/fetch() for this
+  // thread (e.g. on page load).
+  const lastPushedCountRef = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (isSearchStale || isHydrating) return;
+    if (search.status !== "success" && search.status !== "error") return;
+    const count = search.pagination.total ?? search.results.length;
+    if (count === lastPushedCountRef.current.get(threadKey)) return;
+    lastPushedCountRef.current.set(threadKey, count);
+    aui.threadListItem.updateCustom({ trialCount: count });
+  }, [
+    search.status,
+    search.pagination.total,
+    search.results.length,
+    aui,
+    threadKey,
+    isSearchStale,
+    isHydrating,
+  ]);
 
   // Push the full (unsummarized) active-search context into the
   // LangGraph run's shared state — see `activeTrialSearch` on
@@ -107,31 +151,33 @@ export function TrialSearchChatBridge() {
   const setLangGraphState = useLangGraphSetState();
   const lastStagedSignatureRef = useRef<string | null>(null);
   useEffect(() => {
-    if (search.status === "idle") return;
+    if (isSearchStale || isHydrating || search.status === "idle") return;
     const selectedTrials = (search.selectedTrialIds ?? [])
       .map((id) => search.results.find((t) => t.id === id))
       .filter((t): t is NonNullable<typeof t> => Boolean(t));
-    const payload = {
-      criteria: search.criteria,
-      sort: search.sort,
-      pagination: search.pagination,
-      results: search.results,
-      selectedTrials,
-      status: search.status,
-    };
-    const signature = JSON.stringify(payload);
+    // Always stage the same complete shape that Panel persistence writes.
+    // The agent trims model context locally, never the checkpoint value.
+    const payload = { ...toPersistedTrialSearch(search), selectedTrials };
+    const signature = JSON.stringify([threadKey, payload]);
     if (signature === lastStagedSignatureRef.current) return;
     lastStagedSignatureRef.current = signature;
     setLangGraphState({ activeTrialSearch: payload });
-  }, [search, setLangGraphState]);
+  }, [search, threadKey, setLangGraphState, isSearchStale, isHydrating]);
 
   useEffect(() => {
-    for (const message of messages) {
-      const parts = (message.parts ?? []) as unknown as RawToolCallPart[];
-      for (const part of parts) {
+    if (isSearchStale || isHydrating) return;
+    const parts = messages.flatMap((message) =>
+      (message.parts ?? []) as unknown as RawToolCallPart[]
+    );
+    // A restored snapshot may include later Panel edits. Replaying the chat
+    // results that produced it would erase those edits on every first visit.
+    const appliedIndex = search.lastAppliedToolCallId ? parts.findIndex((part) =>
+      part.type === "tool-call" && part.toolCallId === search.lastAppliedToolCallId
+    ) : -1;
+    for (const part of parts.slice(appliedIndex + 1)) {
         if (part.type !== "tool-call" || part.toolName !== "trial_search") continue;
         if (part.status?.type !== "complete") continue;
-        const key = part.toolCallId ?? "";
+        const key = part.toolCallId ? `${threadKey}:${part.toolCallId}` : "";
         if (!key || processedRef.current.has(key)) continue;
 
         const result = parseResult(part.result);
@@ -151,13 +197,13 @@ export function TrialSearchChatBridge() {
         processedRef.current.add(key);
         ingestChatToolResult(mergedCriteria, result.trials, {
           isNewSearch,
+          toolCallId: part.toolCallId,
           total: result.total,
           totalPages: result.totalPages,
           page: result.page,
         });
-      }
     }
-  }, [messages, ingestChatToolResult]);
+  }, [messages, ingestChatToolResult, threadKey, isSearchStale, isHydrating, search.lastAppliedToolCallId]);
 
   return null;
 }

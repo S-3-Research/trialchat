@@ -90,11 +90,20 @@ export function createAgentNode(config: AgentNodeConfig) {
     // always sees exactly one, the current one (or none, if the user
     // hasn't searched yet).
     if (config.includeActiveTrialSearchContext && state.activeTrialSearch) {
+      const selectedTrials = (
+        state.activeTrialSearch as { selectedTrials?: unknown[] }
+      ).selectedTrials;
       messages.push({
         role: "system" as const,
         content:
           "Current active trial search (from the user's Trial Panel, may have been changed directly in the panel without a chat message — treat this as ground truth for 'this search'/'these results'/'this trial'):\n" +
-          JSON.stringify(state.activeTrialSearch, null, 2),
+          JSON.stringify({
+            ...state.activeTrialSearch,
+            results: selectedTrials?.length ? undefined : state.activeTrialSearch.results,
+          }, null, 2) +
+          (selectedTrials?.length
+            ? "\n\nIMPORTANT: the user has pinned the trial(s) above in `selectedTrials` (shown in the UI as \"Re: <trial title>\" pills on their message composer). If their next message doesn't otherwise name a different trial or ask to start a new search, treat it as scoped ONLY to these pinned trial(s) — answer using just their data, don't fall back to summarizing the full `results` list."
+            : ""),
       });
     }
 

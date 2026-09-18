@@ -19,6 +19,48 @@ import type { ThreadMessage } from "@assistant-ui/react";
  * assistant-ui LangGraph docs recommendation (keeps ids aligned with what
  * `load`/`stream` in useLangGraphRuntime receive).
  */
+/**
+ * Reads the trial result count straight off a LangGraph thread's own
+ * checkpoint `values` (already returned by `threads.search`/`threads.get`
+ * — no extra `getState` round-trip needed per thread) so the sidebar can
+ * show "how many trials" without any additional network calls. Falls back
+ * to `results.length` if `pagination.total` is missing (e.g. very old
+ * checkpoints written before pagination existed).
+ */
+function extractTrialCount(values: unknown): number | undefined {
+  const activeTrialSearch = (values as { activeTrialSearch?: unknown } | undefined)
+    ?.activeTrialSearch as
+    | { pagination?: { total?: number }; results?: unknown[] }
+    | undefined;
+  if (!activeTrialSearch) return undefined;
+  if (typeof activeTrialSearch.pagination?.total === "number") {
+    return activeTrialSearch.pagination.total;
+  }
+  if (Array.isArray(activeTrialSearch.results)) {
+    return activeTrialSearch.results.length;
+  }
+  return undefined;
+}
+
+/**
+ * Reads whatever was last written by `updateCustom` below, so a thread's
+ * `custom.trialCount` (e.g. right after a Panel edit or a Chat-driven
+ * search settles — see TrialSearchChatBridge.tsx) survives being read
+ * back via `list()`/`fetch()`, instead of always being silently
+ * recomputed from a possibly-stale `values.activeTrialSearch` snapshot.
+ * Falls back to the checkpoint-derived count when nothing's been
+ * explicitly pushed yet (e.g. right after page load, before this
+ * session's bridge has run once).
+ */
+function resolveTrialCount(
+  values: unknown,
+  metadata: { custom?: Record<string, unknown> } | undefined
+): number | undefined {
+  const pushed = metadata?.custom?.trialCount;
+  if (typeof pushed === "number") return pushed;
+  return extractTrialCount(values);
+}
+
 export function createThreadListAdapter(
   client: Client,
   userId: string
@@ -37,6 +79,7 @@ export function createThreadListAdapter(
           const metadata = (t.metadata ?? {}) as {
             title?: string;
             archived?: boolean;
+            custom?: Record<string, unknown>;
           };
           return {
             status: metadata.archived ? "archived" : "regular",
@@ -44,6 +87,7 @@ export function createThreadListAdapter(
             externalId: t.thread_id,
             title: metadata.title,
             lastMessageAt: t.updated_at ? new Date(t.updated_at) : undefined,
+            custom: { trialCount: resolveTrialCount(t.values, metadata) },
           };
         }),
       };
@@ -56,6 +100,20 @@ export function createThreadListAdapter(
 
     async rename(remoteId, title) {
       await client.threads.update(remoteId, { metadata: { title } });
+    },
+
+    // Required by RemoteThreadListAdapter for `aui.threadListItem.
+    // updateCustom()` (see TrialSearchChatBridge.tsx, which pushes a live
+    // `trialCount` here whenever a search settles) to actually persist
+    // instead of throwing "does not support updating custom metadata".
+    // Merged into (not replacing) the thread's existing `metadata.custom`
+    // so this can't clobber other custom fields added elsewhere later.
+    async updateCustom(remoteId, custom) {
+      const t = await client.threads.get(remoteId);
+      const metadata = (t.metadata ?? {}) as { custom?: Record<string, unknown> };
+      await client.threads.update(remoteId, {
+        metadata: { custom: { ...metadata.custom, ...custom } },
+      });
     },
 
     async archive(remoteId) {
@@ -75,6 +133,7 @@ export function createThreadListAdapter(
       const metadata = (t.metadata ?? {}) as {
         title?: string;
         archived?: boolean;
+        custom?: Record<string, unknown>;
       };
       return {
         status: metadata.archived ? "archived" : "regular",
@@ -82,6 +141,7 @@ export function createThreadListAdapter(
         externalId: t.thread_id,
         title: metadata.title,
         lastMessageAt: t.updated_at ? new Date(t.updated_at) : undefined,
+        custom: { trialCount: resolveTrialCount(t.values, metadata) },
       };
     },
 

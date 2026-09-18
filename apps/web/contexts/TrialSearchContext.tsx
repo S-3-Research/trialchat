@@ -4,6 +4,8 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -14,6 +16,8 @@ import {
   createSearchId,
   DEFAULT_PAGE_SIZE,
   MAX_SELECTED_TRIALS,
+  toPersistedTrialSearch,
+  type PersistedTrialSearch,
   type Trial,
   type TrialSearchCriteria,
   type TrialSearchSort,
@@ -35,10 +39,47 @@ import {
  * structured tool call, whose result is ingested here the same way.
  */
 
+import { LatestThreadSaveQueue } from "@/lib/latestThreadSaveQueue";
+
 type TrialSearchSource = "chat" | "panel";
+
+export type TrialPersistenceStatus = "idle" | "saving" | "saved" | "error";
+
+/**
+ * Injected by AssistantPanel.tsx once a thread id is known (never present
+ * for a brand-new, not-yet-created thread). Saves the *current* search
+ * directly into the LangGraph thread's checkpoint — independent of
+ * whether a chat turn ever runs — so Panel-only edits (filters, sort,
+ * pagination, selection) survive a thread switch/reload per the
+ * thread-scoped persistence spec (section 3: "do not wait for page
+ * close/thread switch to save").
+ */
+export type TrialSearchPersistenceAdapter = {
+  save: (payload: PersistedTrialSearch, opts: { signal: AbortSignal }) => Promise<void>;
+};
 
 type TrialSearchApi = {
   search: TrialSearchState;
+  /**
+   * The thread key `search` currently belongs to (mirrors the `threadKey`
+   * prop passed into the Provider). Exposed so consumers that read
+   * `search` from OUTSIDE this Provider's own reset-effect machinery
+   * (e.g. TrialSearchChatBridge.tsx, which also has its own `aui`-derived
+   * notion of "current thread") can guard against acting on `search` while
+   * it's still momentarily the OLD thread's data during a switch — see
+   * `searchOwnerThreadKeyRef`'s doc comment in the Provider for the full
+   * race-condition rationale.
+   */
+  threadKey: string;
+  persistenceStatus: TrialPersistenceStatus;
+  /**
+   * True while AssistantPanel is fetching this thread's persisted Trial
+   * Panel state from its checkpoint — lets the Panel show a skeleton
+   * instead of either a stale previous thread's content or a blank/idle
+   * flash while the network round-trip is in flight. Always `false` for
+   * a brand-new thread (see AssistantPanel.tsx).
+   */
+  isHydrating: boolean;
   /**
    * Search history (spec section 17) — not yet exposed in any UI, but the
    * state is tracked from day one so a future "Recent searches" panel
@@ -52,11 +93,13 @@ type TrialSearchApi = {
   closePanel: () => void;
   startNewTrialSearch: (
     criteria: TrialSearchCriteria,
-    source?: TrialSearchSource
+    source?: TrialSearchSource,
+    sort?: TrialSearchSort
   ) => Promise<void>;
   updateTrialSearch: (
     patch: Partial<TrialSearchCriteria>,
-    source?: TrialSearchSource
+    source?: TrialSearchSource,
+    sort?: TrialSearchSort
   ) => Promise<void>;
   updateTrialSearchSort: (sort: TrialSearchSort) => Promise<void>;
   loadNextTrialSearchPage: () => Promise<void>;
@@ -72,6 +115,7 @@ type TrialSearchApi = {
     trials: Trial[],
     opts: {
       isNewSearch: boolean;
+      toolCallId?: string;
       total?: number;
       totalPages?: number;
       page?: number;
@@ -110,10 +154,48 @@ async function callTrialSearchApi(
   };
 }
 
-export function TrialSearchProvider({ children }: { children: ReactNode }) {
-  const [search, setSearch] = useState<TrialSearchState>(createIdleTrialSearch());
+export function TrialSearchProvider({
+  children,
+  threadKey,
+  initialState,
+  persistenceAdapter,
+  isHydrating,
+}: {
+  children: ReactNode;
+  /**
+   * Stable identity of the thread currently being viewed (AssistantPanel's
+   * `activeThreadKey`, i.e. `threadListItem.id`, or a fixed sentinel like
+   * "new" when there is none). The Provider is NO LONGER remounted (keyed)
+   * on this value — that used to reset `panelOpen` to `false` on every
+   * genuine thread switch, producing a visible collapse+reopen ("slide")
+   * animation. Instead this is a plain prop: an effect keyed on it (a)
+   * flushes any not-yet-saved edit for the OLD thread using the OLD
+   * `persistenceAdapter` (via closure) and (b) resets `search` to the NEW
+   * thread's `initialState`, while deliberately leaving `panelOpen` alone.
+   */
+  threadKey: string;
+  /**
+   * Hydrated Trial Panel state for the thread currently being opened —
+   * see AssistantPanel.tsx's `load()` callback / TrialThreadSync, which
+   * reads it back out of the thread's LangGraph checkpoint via
+   * `fromPersistedTrialSearch`. Only consulted when `threadKey` actually
+   * changes (see the reset effect below), not on every render.
+   */
+  initialState?: TrialSearchState;
+  persistenceAdapter?: TrialSearchPersistenceAdapter;
+  /** See `isHydrating` on `TrialSearchApi` above. */
+  isHydrating?: boolean;
+}) {
+  const [search, setSearch] = useState<TrialSearchState>(
+    () => initialState ?? createIdleTrialSearch()
+  );
+  // Deliberately NOT reset when `threadKey` changes — see the `threadKey`
+  // comment above. Preserving this across thread switches is what fixes
+  // the reported "panel slides on every switch" bug.
   const [panelOpen, setPanelOpen] = useState(false);
   const userClosedPanelRef = useRef(false);
+  const [persistenceStatus, setPersistenceStatus] =
+    useState<TrialPersistenceStatus>("idle");
 
   // Search history (spec section 17): snapshots of past *active* searches,
   // pushed only on true new-search transitions (never on refine/paginate/
@@ -163,6 +245,12 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
       const controller = new AbortController();
       abortRef.current = controller;
       const myRequestId = ++requestIdRef.current;
+
+      // Reset any leftover selection-toggle debounce (see `saveDelayRef`'s
+      // comment above) — an Edit-filters/sort/paginate action is already
+      // gated behind an explicit user action, so its resulting save should
+      // never inherit a stale 150ms delay from an earlier card click.
+      saveDelayRef.current = 0;
 
       pushToHistoryIfNewSearch(opts.isNewSearch);
 
@@ -227,8 +315,9 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
   );
 
   const startNewTrialSearch = useCallback(
-    async (criteria: TrialSearchCriteria, source: TrialSearchSource = "panel") => {
+    async (criteria: TrialSearchCriteria, source: TrialSearchSource = "panel", sort: TrialSearchSort = "relevance") => {
       await runSearch(criteria, {
+        sort,
         page: 1,
         pageSize: DEFAULT_PAGE_SIZE,
         isNewSearch: true,
@@ -239,10 +328,10 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
   );
 
   const updateTrialSearch = useCallback(
-    async (patch: Partial<TrialSearchCriteria>, source: TrialSearchSource = "panel") => {
+    async (patch: Partial<TrialSearchCriteria>, source: TrialSearchSource = "panel", sort?: TrialSearchSort) => {
       const nextCriteria = { ...search.criteria, ...patch };
       await runSearch(nextCriteria, {
-        sort: search.sort,
+        sort: sort ?? search.sort,
         page: 1,
         pageSize: search.pagination.pageSize || DEFAULT_PAGE_SIZE,
         isNewSearch: false,
@@ -278,6 +367,10 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
   }, [runSearch, search.criteria, search.sort, search.pagination]);
 
   const toggleTrialSelection = useCallback((trialId: string) => {
+    // The only mutator with no "Apply"-style gate — a user can click several
+    // cards in a row, so give the persistence save a brief debounce here
+    // (see `saveDelayRef`'s comment above) instead of saving on every click.
+    saveDelayRef.current = 150;
     setSearch((prev) => {
       const current = prev.selectedTrialIds ?? [];
       const alreadySelected = current.includes(trialId);
@@ -288,6 +381,119 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
       return { ...prev, selectedTrialIds: [...current, trialId] };
     });
   }, []);
+
+  // --- Thread-scoped persistence ------------------------------------
+  //
+  // Saves the *settled* search (never mid-flight "searching"/
+  // "loading-more" states in the debounced path — those are about to be
+  // replaced by their own result anyway) directly into the thread's
+  // LangGraph checkpoint, independent of whether a chat turn ever runs.
+  // Debounced so rapid Panel edits (e.g. dragging an age slider) don't
+  // fire a save per keystroke; deduped by signature so re-renders that
+  // don't actually change the persisted fields never re-save.
+  //
+  // A separate baseline for each thread prevents cross-thread deduplication.
+  const persistedSignaturesRef = useRef<Map<string, string | null>>(
+    new Map(
+      initialState
+        ? [[threadKey, JSON.stringify(toPersistedTrialSearch(initialState))]]
+        : []
+    )
+  );
+
+  // Only committed effects update ownership; abandoned concurrent renders
+  // must not change which thread an adapter or an async result belongs to.
+  const searchOwnerThreadKeyRef = useRef(threadKey);
+  const [prevThreadKey, setPrevThreadKey] = useState(threadKey);
+
+  // How long the debounced-save effect below should wait before saving the
+  // *next* `search` change. Most mutations (Edit-filters submit, sort,
+  // pagination, Chat-ingested results) are already throttled upstream by
+  // requiring an explicit user action (e.g. clicking "Apply"), so there's
+  // nothing left to debounce — save immediately (0ms) so persistence feels
+  // as responsive as the rest of the UI. Only `toggleTrialSelection` (which
+  // fires on every card click with no "Apply" gate, and a user may click
+  // several cards in quick succession) sets this to a short debounce right
+  // before its own `setSearch` call.
+  const saveDelayRef = useRef(0);
+
+  const currentPersistenceAdapterRef = useRef(persistenceAdapter);
+
+  // Shared save path used by both the debounced-save effect and the
+  // thread-switch flush effect below — skips if there's nothing to save,
+  // nothing changed since the last save, or `status` is one not worth
+  // persisting; otherwise saves and updates the signature baseline.
+  const [saveQueue] = useState(() => new LatestThreadSaveQueue());
+  const trySave = useCallback(
+    (
+      adapter: TrialSearchPersistenceAdapter | undefined,
+      current: TrialSearchState,
+      allowInFlight: boolean,
+      forThreadKey: string,
+    ) => {
+      if (!adapter) return;
+      const skippableStatus = allowInFlight ? current.status === "idle" : current.status !== "success" && current.status !== "error";
+      if (skippableStatus) return;
+      const payload = toPersistedTrialSearch(current);
+      const signature = JSON.stringify(payload);
+      if (!saveQueue.hasPending(forThreadKey) && signature === (persistedSignaturesRef.current.get(forThreadKey) ?? null)) return;
+      if (searchOwnerThreadKeyRef.current === forThreadKey) setPersistenceStatus("saving");
+      saveQueue.enqueue(forThreadKey, signature, () =>
+        adapter.save(payload, { signal: new AbortController().signal })
+      ).then((isLatest) => {
+        if (!isLatest) return;
+        persistedSignaturesRef.current.set(forThreadKey, signature);
+        if (searchOwnerThreadKeyRef.current === forThreadKey) setPersistenceStatus("saved");
+      }).catch((error) => {
+        console.error("[TrialSearchContext] Failed to persist trial state:", error);
+        if (searchOwnerThreadKeyRef.current === forThreadKey) setPersistenceStatus("error");
+      });
+    },
+    [saveQueue]
+  );
+
+  useEffect(() => {
+    if (!persistenceAdapter) return;
+    if (prevThreadKey !== threadKey || searchOwnerThreadKeyRef.current !== threadKey) return;
+    if (search.status !== "success" && search.status !== "error") return;
+    const payload = toPersistedTrialSearch(search);
+    if (!saveQueue.hasPending(threadKey) && JSON.stringify(payload) === (persistedSignaturesRef.current.get(threadKey) ?? null)) return;
+
+    const timer = setTimeout(
+      () => trySave(persistenceAdapter, search, false, threadKey),
+      saveDelayRef.current
+    );
+    return () => clearTimeout(timer);
+  }, [search, persistenceAdapter, trySave, threadKey, prevThreadKey, saveQueue]);
+
+  // Reset only after commit. Until this layout effect applies the new
+  // snapshot, consumers receive the OLD owner key and a loading flag, so
+  // a new thread's tool messages cannot mutate the old search.
+  useLayoutEffect(() => {
+    if (prevThreadKey !== threadKey) {
+      trySave(currentPersistenceAdapterRef.current, search, true, prevThreadKey);
+      abortRef.current?.abort();
+      requestIdRef.current++;
+      searchOwnerThreadKeyRef.current = threadKey;
+      setPrevThreadKey(threadKey);
+      setSearch(initialState ?? createIdleTrialSearch());
+      persistedSignaturesRef.current.set(
+        threadKey,
+        initialState ? JSON.stringify(toPersistedTrialSearch(initialState)) : null
+      );
+      setPersistenceStatus("idle");
+      setSearchHistory([]);
+    }
+    currentPersistenceAdapterRef.current = persistenceAdapter;
+  }, [threadKey, prevThreadKey, initialState, persistenceAdapter, search, trySave]);
+
+  // "Saved" is a transient confirmation, not a permanent status — fade
+  // back to idle a couple seconds after a successful save.
+  useEffect(() => {
+    if (persistenceStatus !== "saved") return;
+    const timer = setTimeout(() => setPersistenceStatus("idle"), 2000);
+    return () => clearTimeout(timer);
+  }, [persistenceStatus]);
 
   /**
    * `askedTrialIds` tracks which trial(s) are being asked about for the
@@ -320,17 +526,22 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
       trials: Trial[],
       opts: {
         isNewSearch: boolean;
+        toolCallId?: string;
         total?: number;
         totalPages?: number;
         page?: number;
       }
     ) => {
       const myRequestId = ++requestIdRef.current;
+      // Same rationale as `runSearch` above — Chat-driven results should
+      // save immediately, not inherit a stale selection-toggle debounce.
+      saveDelayRef.current = 0;
       pushToHistoryIfNewSearch(opts.isNewSearch);
       setSearch((prev) => ({
         ...prev,
         id: opts.isNewSearch ? createSearchId() : prev.id,
         criteria,
+        lastAppliedToolCallId: opts.toolCallId ?? prev.lastAppliedToolCallId,
         results: trials,
         pagination: {
           page: opts.page ?? 1,
@@ -356,6 +567,9 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
   const value = useMemo<TrialSearchApi>(
     () => ({
       search,
+      threadKey: prevThreadKey,
+      persistenceStatus,
+      isHydrating: !!isHydrating || prevThreadKey !== threadKey,
       searchHistory,
       panelOpen,
       openPanel,
@@ -371,6 +585,10 @@ export function TrialSearchProvider({ children }: { children: ReactNode }) {
     }),
     [
       search,
+      threadKey,
+      prevThreadKey,
+      persistenceStatus,
+      isHydrating,
       searchHistory,
       panelOpen,
       openPanel,

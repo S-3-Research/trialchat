@@ -14,6 +14,8 @@ import {
   ExternalLink,
   MessageCircle,
   Cake,
+  FileText,
+  ClipboardList,
 } from "lucide-react";
 import { useTrialSearch } from "@/contexts/TrialSearchContext";
 import type { Trial, TrialSearchState } from "@/lib/types/trialSearch";
@@ -27,6 +29,26 @@ import { TrialSearchModal } from "@/components/assistant-ui/TrialSearchModal";
  * both layouts stay in sync.
  */
 export const TRIAL_PANEL_WIDTH_PERCENT = 38;
+
+/**
+ * Width used for the Trial Panel's mobile/"overlay" full-height sheet
+ * (see AssistantPanel.tsx's `isMobile && trialPanelOpen` block) — this is
+ * intentionally a SEPARATE constant from `TRIAL_PANEL_WIDTH_PERCENT`
+ * rather than reusing it, since `min(${TRIAL_PANEL_WIDTH_PERCENT}%, 92%)`
+ * previously meant "38% of a narrow phone viewport", i.e. a tiny sheet.
+ * On mobile the panel isn't sharing width with chat (it overlays on top
+ * instead), so it should read as "almost full width", capped so it
+ * doesn't get absurdly wide on a tablet-sized "overlay" viewport.
+ */
+export const TRIAL_PANEL_MOBILE_WIDTH = "min(92%, 30rem)";
+
+/**
+ * Single source of truth for the panel's horizontal padding (header,
+ * criteria row, and the scrollable trial list all share this so they stay
+ * visually aligned) — change this one value to adjust the panel's left/
+ * right inset instead of hunting down each `px-5` individually.
+ */
+const PANEL_PADDING_X = "pl-6 pr-5";
 
 /**
  * Persistent, collapsible right-side "Trial Panel" — the structured
@@ -70,7 +92,7 @@ function formatLocation(t: Trial): string | null {
   const loc = t.locations?.[0];
   if (!loc) return null;
   const city = loc.city ? toTitleCase(loc.city) : undefined;
-  const state = loc.state ? loc.state.toUpperCase() : undefined;
+  const state = loc.state ? (loc.state.length === 2 ? loc.state.toUpperCase() : toTitleCase(loc.state)) : undefined;
   return [city, state].filter(Boolean).join(", ") || (loc.country ? toTitleCase(loc.country) : null);
 }
 
@@ -88,7 +110,7 @@ function MatchReports({ trial, asked }: { trial: Trial; asked?: boolean }) {
         <span
           key={r.filter_type}
           title={r.result_text}
-          className={`flex items-center gap-1 text-[11px] ${
+          className={`flex items-center gap-1 text-[0.6875rem] ${
             asked
               ? "font-bold text-emerald-700 dark:text-emerald-400"
               : "font-medium text-slate-500 dark:text-slate-400"
@@ -190,19 +212,19 @@ function TrialCard({
                   : "bg-slate-300 dark:bg-slate-600"
               }`}
             />
-            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 tracking-wide">
+            <span className="text-[0.6875rem] font-bold text-slate-700 dark:text-slate-300 tracking-wide">
               {trial.recruitment_status
                 ? toTitleCase(abbreviateStatus(trial.recruitment_status)).toUpperCase()
                 : "STATUS UNKNOWN"}
             </span>
             {phase && (
-              <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+              <span className="text-[0.625rem] font-bold tracking-wide px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                 {toTitleCase(abbreviatePhase(phase))}
               </span>
             )}
           </div>
           <span
-            className={`text-[10px] px-2 py-1 rounded-full font-mono font-bold shrink-0 ${
+            className={`text-[0.625rem] px-2 py-1 rounded-full font-mono font-bold shrink-0 ${
               asked
                 ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
                 : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
@@ -214,14 +236,14 @@ function TrialCard({
 
         {/* Typography */}
         <h3
-          className={`text-[15px] font-bold leading-tight mb-1 line-clamp-2 ${
+          className={`text-[0.9375rem] font-bold leading-tight mb-1 line-clamp-2 ${
             asked ? "text-emerald-700 dark:text-emerald-400" : "text-slate-800 dark:text-white"
           }`}
         >
           {trial.title ?? "Untitled trial"}
         </h3>
         {trial.conditions?.length ? (
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-1">
+          <p className="text-[0.8125rem] text-slate-500 dark:text-slate-400 mb-4 line-clamp-1">
             {trial.conditions.join(", ")}
           </p>
         ) : (
@@ -232,7 +254,7 @@ function TrialCard({
         {(location || (trial.min_age !== undefined && trial.max_age !== undefined)) && (
           <div className="flex flex-wrap gap-2 mb-4">
             {location && (
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm">
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full text-[0.6875rem] font-semibold text-slate-600 dark:text-slate-300 shadow-sm">
                 <MapPin
                   className={`w-3 h-3 shrink-0 ${
                     asked ? "text-emerald-500" : "text-purple-500 dark:text-purple-400"
@@ -243,7 +265,7 @@ function TrialCard({
               </div>
             )}
             {trial.min_age !== undefined && trial.max_age !== undefined && (
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full text-[11px] font-semibold text-slate-600 dark:text-slate-300 shadow-sm">
+              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-full text-[0.6875rem] font-semibold text-slate-600 dark:text-slate-300 shadow-sm">
                 <Cake
                   className={`w-3 h-3 shrink-0 ${
                     asked ? "text-emerald-500" : "text-purple-500 dark:text-purple-400"
@@ -348,15 +370,17 @@ function TrialCard({
                   <button
                     type="button"
                     onClick={sendPresetQuestion("Give me a plain-language summary")}
-                    className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="flex w-full items-center gap-2 text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
+                    <FileText className="w-3.5 h-3.5 shrink-0 opacity-70" strokeWidth={2} />
                     Summary
                   </button>
                   <button
                     type="button"
                     onClick={sendPresetQuestion("Explain the eligibility criteria in plain language")}
-                    className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    className="flex w-full items-center gap-2 text-left px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
+                    <ClipboardList className="w-3.5 h-3.5 shrink-0 opacity-70" strokeWidth={2} />
                     Eligibility
                   </button>
                 </div>
@@ -409,6 +433,13 @@ function CriteriaRow() {
   const visible = chips.slice(0, MAX_VISIBLE_CHIPS);
   const overflow = chips.slice(MAX_VISIBLE_CHIPS);
   const modalMode = search.status === "idle" ? "new" : "refine";
+  // Edited filters call the trial-search API directly and save straight
+  // into the thread's checkpoint (contexts/TrialSearchContext.tsx), which
+  // conflicts with a chat run holding the same checkpoint locked — the
+  // save then gets rejected with a 409 "Thread is busy" (retried with
+  // backoff, but still a confusing few-seconds-delayed save). Simplest
+  // fix: don't let the user open the editor mid-run at all.
+  const isRunning = useAuiState((s) => s.thread.isRunning);
 
   return (
     <>
@@ -433,7 +464,9 @@ function CriteriaRow() {
         <button
           type="button"
           onClick={() => setModalOpen(true)}
-          className="ml-auto shrink-0 flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+          disabled={isRunning}
+          title={isRunning ? "Wait for the current chat response to finish" : undefined}
+          className="ml-auto shrink-0 flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
         >
           <Pencil className="w-3 h-3" strokeWidth={2} />
           Edit filters
@@ -489,10 +522,40 @@ function EmptyState() {
   );
 }
 
+/**
+ * Shown by `TrialPanel` while `isHydrating` is true (fetch of the selected
+ * thread's persisted Trial Panel state, see AssistantPanel.tsx) — a header + a couple of
+ * card-shaped shimmer placeholders, matching the real layout's rough
+ * proportions closely enough that the swap-in doesn't visibly jump.
+ */
+function TrialPanelSkeleton() {
+  return (
+    <div className="w-full h-full flex flex-col pt-5 pb-5 min-w-0">
+      <div className={`flex items-center justify-between mb-2 shrink-0 ${PANEL_PADDING_X}`}>
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Trial Panel
+        </span>
+      </div>
+      <div className={`shrink-0 pb-3 ${PANEL_PADDING_X}`}>
+        <div className="animate-pulse h-8 w-full rounded-xl bg-slate-100 dark:bg-slate-800/60" />
+      </div>
+      <div className={`flex-1 min-h-0 ${PANEL_PADDING_X} pt-4 space-y-3`}>
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="animate-pulse h-32 w-full rounded-2xl bg-slate-100 dark:bg-slate-800/60"
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function TrialPanel() {
   const {
     search,
     panelOpen,
+    isHydrating,
     closePanel,
     loadNextTrialSearchPage,
     toggleTrialSelection,
@@ -518,13 +581,14 @@ export function TrialPanel() {
 
   if (!panelOpen) return null;
 
+  // Keep the previous thread's cards hidden while fetching this checkpoint.
+  if (isHydrating) return <TrialPanelSkeleton />;
+
   const { results, pagination, status } = search;
-  const showLoadMore =
-    results.length > 0 && status === "success" && pagination.hasNextPage;
 
   return (
     <div className="w-full h-full flex flex-col pt-5 pb-5 min-w-0">
-      <div className="flex items-center justify-between mb-2 shrink-0 px-5">
+      <div className={`flex items-center justify-between mb-2 shrink-0 ${PANEL_PADDING_X}`}>
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
           Trial Panel
           {pagination.total > 0 && (
@@ -542,7 +606,7 @@ export function TrialPanel() {
         </button>
       </div>
 
-      <div className="shrink-0 pb-3 px-5">
+      <div className={`shrink-0 pb-3 ${PANEL_PADDING_X}`}>
         <CriteriaRow />
       </div>
 
@@ -555,7 +619,7 @@ export function TrialPanel() {
        */}
       <div className="relative flex-1 min-h-0">
         <div
-          className="absolute inset-0 overflow-y-auto sidebar-scrollbar px-5 pt-4 pb-2"
+          className={`absolute inset-0 overflow-y-auto sidebar-scrollbar ${PANEL_PADDING_X} pt-4 pb-2`}
           style={{
             maskImage:
               "linear-gradient(to bottom, transparent, black 1rem, black calc(100% - 1rem), transparent 100%)",
@@ -566,7 +630,7 @@ export function TrialPanel() {
           {status === "idle" && (
             <div className="text-sm text-slate-500 dark:text-slate-400">
               No active trial search yet. Ask about a condition in chat, or
-              use "Edit filters" above, to get started.
+              use &quot;Edit filters&quot; above, to get started.
             </div>
           )}
 
@@ -591,42 +655,46 @@ export function TrialPanel() {
             />
           ))}
 
-          {(status === "searching" || status === "loading-more") && (
+          {(status === "searching" && results.length === 0) && (
             <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 py-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
-              {status === "loading-more" ? "Loading more…" : "Updating results…"}
+              Updating results…
             </div>
           )}
 
-          {results.length > 0 && status === "success" && (
+          {/*
+           * "Load more" lives at the bottom of the scrolling list itself
+           * (not a floating footer) and merges with the loading-more
+           * state: while a next-page fetch is in flight it shows the
+           * spinner in the exact spot the button was, then swaps back to
+           * either the button (more pages left) or the "X of Y shown"
+           * summary (no pages left) once it resolves.
+           */}
+          {results.length > 0 && (status === "success" || status === "loading-more") && (
             <div className="flex justify-center pt-1 pb-3">
-              <span className="text-xs text-slate-400 dark:text-slate-500">
-                {results.length} of {pagination.total || results.length} trials
-                shown
-              </span>
+              {status === "loading-more" ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 py-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
+                  Loading more…
+                </div>
+              ) : pagination.hasNextPage ? (
+                <button
+                  type="button"
+                  onClick={() => loadNextTrialSearchPage()}
+                  className="text-xs font-semibold px-4 py-2 rounded-full border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shadow-[0_12px_32px_-8px_rgba(30,41,59,0.12)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.4)] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                  Load more
+                </button>
+              ) : (
+                <span className="text-xs text-slate-400 dark:text-slate-500">
+                  {results.length} of {pagination.total || results.length} trials
+                  shown
+                </span>
+              )}
             </div>
           )}
         </div>
       </div>
-
-      {/*
-       * Floating "Load more" pill — kept out of the scrolling list and
-       * pinned to the bottom of the panel column, at the same height/
-       * padding rhythm as the chat Composer's footer bar (thread.tsx's
-       * `shrink-0 ... pb-6 pt-2` wrapper), so the two columns read as
-       * vertically aligned floating controls.
-       */}
-      {showLoadMore && (
-        <div className="shrink-0 flex justify-center pt-2 px-5">
-          <button
-            type="button"
-            onClick={() => loadNextTrialSearchPage()}
-            className="text-xs font-semibold px-4 py-2 rounded-full border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shadow-[0_12px_32px_-8px_rgba(30,41,59,0.12)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.4)] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            Load more
-          </button>
-        </div>
-      )}
     </div>
   );
 }

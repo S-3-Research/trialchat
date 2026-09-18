@@ -403,6 +403,67 @@ body {
 }
 
 /*
+ * Dual-thumb age range slider (TrialSearchModal.tsx) — two native
+ * <input type="range"> elements stacked on the same track. Each input's
+ * own track/fill is made fully transparent (drawn manually via a
+ * separate absolutely-positioned "filled" div instead) and its hit area
+ * is limited to just the thumb (`pointer-events: none` on the input,
+ * `pointer-events: auto` back on the thumb pseudo-element) so clicking
+ * anywhere on the track doesn't accidentally grab the wrong handle —
+ * only dragging an actual thumb does.
+ */
+.dual-range-slider {
+  position: relative;
+  height: 20px;
+}
+
+.dual-range-slider input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.dual-range-slider input[type="range"]::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 4px;
+}
+
+.dual-range-slider input[type="range"]::-moz-range-track {
+  background: transparent;
+  height: 4px;
+}
+
+.dual-range-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  margin-top: -6px;
+  cursor: pointer;
+}
+
+.dual-range-slider input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #2563eb;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+/*
  ---break---
  */
 
