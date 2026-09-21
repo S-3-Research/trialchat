@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { MapPin, Check, X as XIcon, ChevronRight, ExternalLink, MessageCircle, Cake, FileText, ClipboardList } from "lucide-react";
+import { MapPin, Check, X as XIcon, ChevronRight, ExternalLink, MessageCircle, Cake, FileText, ClipboardList, ChevronDown } from "lucide-react";
 import type { Trial } from "@/lib/types/trialSearch";
 import { BookmarkButton } from "@/components/bookmarks/BookmarkButton";
 import { useBookmarks } from "@/hooks/useBookmarks";
@@ -132,7 +132,7 @@ export function TrialCard({
   const dimmed = locked && !asked;
   return (
     <div
-      className={`relative bg-gradient-to-b from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-[24px] border-1 p-1 mb-3 transition-shadow duration-300 ${
+      className={`relative bg-gradient-to-b from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-[24px] border-1 p-1 mb-3 animate-trial-card-enter transition-[border-color,box-shadow] duration-300 ${
         dimmed ? "cursor-default" : "cursor-pointer"
       } ${
         asked
@@ -179,20 +179,32 @@ export function TrialCard({
               </span>
             )}
           </div>
-          <span
-            className={`flex items-center gap-1 text-[0.625rem] pl-2 pr-1.5 py-1 rounded-full font-mono font-bold shrink-0 transition-colors duration-200 ${
-              asked
-                ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
-                : bookmarked
-                  ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
+          {mode !== "bookmark-snapshot" && trial.id ? (
+            <BookmarkButton
+              trial={trial}
+              sourceThreadId={sourceThreadId}
+              sourceSearchId={sourceSearchId}
+              pillClassName={`flex items-center gap-1 text-[0.625rem] pl-2 pr-1.5 py-1 rounded-full font-mono font-bold shrink-0 transition-colors duration-200 ${
+                asked
+                  ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
+                  : bookmarked
+                    ? "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
+              }`}
+            >
+              #{String(index + 1).padStart(2, "0")}
+            </BookmarkButton>
+          ) : (
+            <span
+              className={`flex items-center gap-1 text-[0.625rem] pl-2 pr-1.5 py-1 rounded-full font-mono font-bold shrink-0 transition-colors duration-200 ${
+                asked
+                  ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400"
                   : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
-            }`}
-          >
-            #{String(index + 1).padStart(2, "0")}
-            {mode !== "bookmark-snapshot" && trial.id && (
-              <BookmarkButton trial={trial} sourceThreadId={sourceThreadId} sourceSearchId={sourceSearchId} compact />
-            )}
-          </span>
+              }`}
+            >
+              #{String(index + 1).padStart(2, "0")}
+            </span>
+          )}
         </div>
 
         {/* Typography */}
@@ -241,33 +253,35 @@ export function TrialCard({
 
         <MatchReports trial={trial} asked={asked} />
 
-        {expanded && (
-          <div className="mb-4 pt-3 border-t border-slate-200/70 dark:border-slate-700/70 text-xs text-slate-600 dark:text-slate-300 space-y-2">
-            {trial.eligibility_summary && (
-              <p className="leading-relaxed">{trial.eligibility_summary}</p>
-            )}
-            {trial.links?.length ? (
-              <div className="flex flex-col gap-1">
-                {trial.links.map((href) => (
-                  <a
-                    key={href}
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline break-all"
-                  >
-                    <ExternalLink className="w-3 h-3 shrink-0" strokeWidth={2} />
-                    {href}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-            {!trial.eligibility_summary && !trial.links?.length && (
-              <p className="text-slate-400 dark:text-slate-500">No additional details available.</p>
-            )}
+        <div className={`accordion-rows ${expanded ? "accordion-open" : "accordion-closed"}`}>
+          <div>
+            <div className="mb-4 pt-3 border-t border-slate-200/70 dark:border-slate-700/70 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+              {trial.eligibility_summary && (
+                <p className="leading-relaxed">{trial.eligibility_summary}</p>
+              )}
+              {trial.links?.length ? (
+                <div className="flex flex-col gap-1">
+                  {trial.links.map((href) => (
+                    <a
+                      key={href}
+                      href={href}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline break-all"
+                    >
+                      <ExternalLink className="w-3 h-3 shrink-0" strokeWidth={2} />
+                      {href}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+              {!trial.eligibility_summary && !trial.links?.length && (
+                <p className="text-slate-400 dark:text-slate-500">No additional details available.</p>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Bottom actions — "View details" as a plain text link (no
             heavy button chrome, matches the reference's minimal treatment)
@@ -284,8 +298,8 @@ export function TrialCard({
             }}
           >
             View details
-            <ChevronRight
-              className={`w-3.5 h-3.5 ml-0.5 transition-transform ${expanded ? "rotate-90" : ""}`}
+            <ChevronDown
+              className={`w-3.5 h-3.5 ml-0.5 transition-transform ${expanded ? "rotate-180" : ""}`}
               strokeWidth={2}
             />
           </button>
@@ -326,7 +340,7 @@ export function TrialCard({
                     height and shifting every card below it down. */}
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 bottom-full mb-1.5 z-20 w-44 rounded-xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 shadow-[0_16px_40px_-8px_rgba(15,23,42,0.35)] dark:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.7)] py-1"
+                  className="absolute right-0 bottom-full mb-1.5 z-20 w-44 rounded-xl border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 shadow-[0_16px_40px_-8px_rgba(15,23,42,0.35)] dark:shadow-[0_16px_40px_-8px_rgba(0,0,0,0.7)] py-1 animate-trial-menu-pop-in"
                 >
                   <button
                     type="button"

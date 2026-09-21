@@ -74,8 +74,8 @@ export function IntakeFormModal({ onComplete, onSkip }: IntakeFormModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8 m-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-modal-backdrop-in">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-8 m-4 animate-modal-card-in">
         {/* Progress indicator */}
         <div className="flex items-center justify-center gap-2 mb-8">
           {[1, 2, 3].map((i) => (

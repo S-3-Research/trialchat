@@ -82,14 +82,14 @@ export function MatchProfileModal({ onConfirm, onClose }: MatchProfileModalProps
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md overflow-y-auto animate-modal-backdrop-in"
       onClick={handleBackdropClick}
     >
       {/* Centering wrapper — padding ensures modal never clips at top/bottom on mobile */}
       <div className="flex min-h-full items-center justify-center p-4">
 
       {/* Card */}
-      <div className="relative w-full max-w-sm rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full max-w-sm rounded-2xl shadow-2xl animate-modal-card-in" onClick={e => e.stopPropagation()}>
 
         {/* Card body */}
         <div className="relative rounded-2xl bg-white dark:bg-[#0f1623] border border-blue-100/40 dark:border-blue-900/30 p-8">

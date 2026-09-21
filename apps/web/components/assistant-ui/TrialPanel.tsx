@@ -102,30 +102,37 @@ function CriteriaRow() {
 
   return (
     <>
-      <div className="flex items-center flex-wrap gap-1.5 mt-1">
-        {visible.map((chip) => (
-          <span
-            key={chip}
-            title={chip}
-            className="text-xs px-2 py-1 rounded-full border border-blue-200 dark:border-blue-500/40 bg-blue-50/60 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 max-w-[9rem] truncate"
-          >
-            {toTitleCase(chip)}
-          </span>
-        ))}
-        {overflow.length > 0 && (
-          <span
-            title={overflow.join(", ")}
-            className="text-xs px-2 py-1 rounded-full border border-blue-200 dark:border-blue-500/40 bg-blue-50/60 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 cursor-default"
-          >
-            +{overflow.length} more
-          </span>
-        )}
+      {/*
+       * Two-column layout — chip column wraps freely on its own, "Edit
+       * filters" sits in a fixed right column, so a long/wrapping set of
+       * criteria chips never pushes or reflows the button's position.
+       */}
+      <div className="grid grid-cols-[1fr_auto] items-start gap-2 mt-1">
+        <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+          {visible.map((chip) => (
+            <span
+              key={chip}
+              title={chip}
+              className="text-xs px-2 py-1 rounded-full border border-blue-200 dark:border-blue-500/40 bg-blue-50/60 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 max-w-[9rem] truncate"
+            >
+              {toTitleCase(chip)}
+            </span>
+          ))}
+          {overflow.length > 0 && (
+            <span
+              title={overflow.join(", ")}
+              className="text-xs px-2 py-1 rounded-full border border-blue-200 dark:border-blue-500/40 bg-blue-50/60 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 cursor-default"
+            >
+              +{overflow.length} more
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => setModalOpen(true)}
           disabled={isRunning}
           title={isRunning ? "Wait for the current chat response to finish" : undefined}
-          className="ml-auto shrink-0 flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
+          className="shrink-0 flex items-center pt-1 gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
         >
           <Pencil className="w-3 h-3" strokeWidth={2} />
           Edit filters
@@ -141,7 +148,7 @@ function CriteriaRow() {
 function EmptyState() {
   const { search, updateTrialSearch } = useTrialSearch();
   return (
-    <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
+    <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 px-4 py-4 text-sm text-slate-500 dark:text-slate-400 animate-trial-card-enter">
       <p className="mb-3">No trials match all current criteria.</p>
       <div className="flex flex-col gap-2">
         {search.criteria.pref_distance !== undefined && (

@@ -102,11 +102,11 @@ export function TrialSearchModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md overflow-y-auto animate-modal-backdrop-in"
       onClick={handleBackdropClick}
     >
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-md rounded-2xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="relative w-full max-w-md rounded-2xl shadow-2xl animate-modal-card-in" onClick={(e) => e.stopPropagation()}>
           <div className="relative rounded-2xl bg-white dark:bg-[#0f1623] border border-blue-100/40 dark:border-blue-900/30 p-8">
             {/* Close button */}
             <button

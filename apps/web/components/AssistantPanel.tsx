@@ -372,7 +372,7 @@ function AssistantPanelBody({
          * width (and thus how much of it is visible) animates.
          */}
         <div
-          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-in-out ${
+          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
             sidebarOpen ? "md:w-64 border-r" : "md:w-0 border-r-0"
           }`}
         >
@@ -475,7 +475,7 @@ function AssistantPanelBody({
          * has to share horizontal space with it.
          */}
         <div
-          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-in-out ${
+          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
             trialPanelOpen ? "border-l" : "border-l-0"
           }`}
           style={{ width: trialPanelOpen ? `${TRIAL_PANEL_WIDTH_PERCENT}%` : 0 }}
