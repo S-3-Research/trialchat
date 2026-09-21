@@ -1,3 +1,4 @@
+import { FROZEN_SCOPE_INSTRUCTIONS, isFrozenScope, toolsForTrialScope } from "../lib/trial-scope.js";
 import { AIMessage, ToolMessage } from "@langchain/core/messages";
 import { tool as makeLangChainTool } from "@langchain/core/tools";
 import { ChatOpenAI } from "@langchain/openai";
@@ -37,6 +38,7 @@ export type AgentNodeConfig = {
   // instead of re-invoking. Omit for no per-tool cap (still bounded by
   // MAX_TOOL_ITERATIONS overall).
   maxCallsPerTool?: number;
+  maxCallsByTool?: Record<string, number>;
   // When true, splice `state.activeTrialSearch` (if present) in as a
   // system-role context message ahead of the conversation history — see
   // the doc comment on that field in state.ts. Only `api-agent.config.ts`
@@ -50,14 +52,6 @@ const MAX_TOOL_ITERATIONS = 4;
 export function createAgentNode(config: AgentNodeConfig) {
   const agentTools = config.tools ?? [];
 
-  const langChainTools = agentTools.map((t) =>
-    makeLangChainTool(t.execute, {
-      name: t.name,
-      description: t.description,
-      schema: t.schema,
-    })
-  );
-
   // These three answer-facing branches (knowledge/api_agent/other_questions)
   // run on a reasoning-capable model via OpenAI's Responses API so we can
   // surface a real `reasoning.summary` on the AIMessage (used to drive a
@@ -70,13 +64,13 @@ export function createAgentNode(config: AgentNodeConfig) {
     useResponsesApi: true,
     reasoning: { summary: "detailed" },
   });
-  const model = langChainTools.length
-    ? base.bindTools(langChainTools, { parallel_tool_calls: true })
-    : base;
-
-  const toolsByName = new Map(langChainTools.map((t) => [t.name, t]));
-
   return async function agentNode(state: AgentStateType) {
+    const frozen = isFrozenScope(state.contextScope);
+    const langChainTools = toolsForTrialScope(agentTools, state.contextScope).map((t) =>
+      makeLangChainTool(t.execute, { name: t.name, description: t.description, schema: t.schema })
+    );
+    const model = langChainTools.length ? base.bindTools(langChainTools, { parallel_tool_calls: true }) : base;
+    const toolsByName = new Map(langChainTools.map((t) => [t.name, t]));
     const messages: Array<{ role: "system"; content: string } | AgentStateType["messages"][number]> = [
       { role: "system" as const, content: config.prompt },
     ];
@@ -89,7 +83,7 @@ export function createAgentNode(config: AgentNodeConfig) {
     // staged, so a long session doesn't accumulate N stale snapshots; it
     // always sees exactly one, the current one (or none, if the user
     // hasn't searched yet).
-    if (config.includeActiveTrialSearchContext && state.activeTrialSearch) {
+    if (!frozen && config.includeActiveTrialSearchContext && state.activeTrialSearch) {
       const selectedTrials = (
         state.activeTrialSearch as { selectedTrials?: unknown[] }
       ).selectedTrials;
@@ -107,6 +101,9 @@ export function createAgentNode(config: AgentNodeConfig) {
       });
     }
 
+    if (frozen) {
+      messages.push({ role: "system", content: FROZEN_SCOPE_INSTRUCTIONS + "\n" + JSON.stringify(state.contextScope) });
+    }
     messages.push(...state.messages);
 
     let response = (await model.invoke(messages)) as AIMessage;
@@ -127,7 +124,8 @@ export function createAgentNode(config: AgentNodeConfig) {
             });
           }
           const count = callCounts.get(call.name) ?? 0;
-          if (config.maxCallsPerTool && count >= config.maxCallsPerTool) {
+          const limit = config.maxCallsByTool?.[call.name] ?? config.maxCallsPerTool;
+          if (limit && count >= limit) {
             // Marked via `artifact` (LangChain's UI-only, non-model-visible
             // payload on ToolMessage — round-trips to the frontend as
             // `part.artifact`, see convertLangChainMessages.js) rather than
@@ -138,7 +136,7 @@ export function createAgentNode(config: AgentNodeConfig) {
             // model still sees the corrective text in `content` either way.
             return new ToolMessage({
               tool_call_id: call.id!,
-              content: `${call.name} has already been called the maximum number of times (${config.maxCallsPerTool}) for this request. Use the results you already have to answer the user instead of calling it again.`,
+              content: `${call.name} has already been called the maximum number of times (${limit}) for this request. Use the results you already have to answer the user instead of calling it again.`,
               artifact: { rejected: true },
             });
           }

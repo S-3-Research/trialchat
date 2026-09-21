@@ -1,3 +1,4 @@
+import { requestedScopes, overwritesFrozenScope } from "@/lib/threadScopeGuard";
 import { NextRequest, NextResponse } from "next/server";
 
 // Node.js runtime — needs to reach the agent over the Docker/host network,
@@ -37,6 +38,19 @@ async function handleRequest(
     };
     if (method !== "GET" && method !== "HEAD") {
       init.body = await req.text();
+      if (path[0] === "threads" && path[1] && ["state", "runs"].includes(path[2])) {
+        let payload: unknown;
+        try { payload = JSON.parse(init.body); } catch { /* upstream validates JSON */ }
+        const writes = requestedScopes(payload);
+        if (writes.length) {
+          const current = await fetch(`${AGENT_BASE_URL}/threads/${encodeURIComponent(path[1])}/state`, { cache: "no-store" });
+          if (!current.ok) return NextResponse.json({ error: "Could not verify conversation scope." }, { status: 502 });
+          const state = await current.json();
+          if (overwritesFrozenScope(state.values?.contextScope, writes)) {
+            return NextResponse.json({ error: "This conversation's trials are fixed. Start a new chat to discuss a different set." }, { status: 409 });
+          }
+        }
+      }
     }
 
     const upstream = await fetch(targetUrl, init);

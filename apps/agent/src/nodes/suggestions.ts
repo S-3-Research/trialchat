@@ -1,3 +1,4 @@
+import { FROZEN_SCOPE_INSTRUCTIONS, isFrozenScope } from "../lib/trial-scope.js";
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { typedUi } from "@langchain/langgraph-sdk/react-ui/server";
@@ -49,7 +50,7 @@ export async function suggestionsAgent(
 ) {
   const result = await model.invoke(
     [
-      { role: "system", content: suggestionsConfig.systemPrompt },
+      { role: "system", content: suggestionsConfig.systemPrompt + (isFrozenScope(state.contextScope) ? "\n" + FROZEN_SCOPE_INSTRUCTIONS + "\nSuggest only questions within these trial IDs: " + JSON.stringify(state.contextScope.trialIds) : "") },
       ...state.messages,
     ],
     config

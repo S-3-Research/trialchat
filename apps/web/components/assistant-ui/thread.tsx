@@ -43,16 +43,20 @@ export const Thread: FC<{
   placeholder: string;
   greeting: string;
   prompts: ChatStarterPrompt[];
-}> = ({ placeholder, greeting, prompts }) => {
+  isScoped?: boolean;
+}> = ({ placeholder, greeting, prompts, isScoped = false }) => {
+  // The top fade mask + offset exist to make room for ChatSurface's floating
+  // "Find matching trials" CTA pill, which is hidden while `isScoped`
+  // (bookmark-snapshot / scoped conversations). Shrink both so scoped
+  // threads don't lose their first messages to an unnecessary fade.
+  const topInset = isScoped ? "1rem" : "4.5rem";
   return (
     <ThreadPrimitive.Root className="flex flex-col h-full w-full bg-transparent">
       <ThreadPrimitive.Viewport
-        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-10 pb-4 pt-8 mt-14 flex flex-col"
+        className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-10 pb-4 pt-8 ${isScoped ? "mt-2" : "mt-14"} flex flex-col`}
         style={{
-          maskImage:
-            "linear-gradient(to bottom, transparent, black 4.5rem, black calc(100% - 2rem), transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, transparent, black 4.5rem, black calc(100% - 2rem), transparent 100%)",
+          maskImage: `linear-gradient(to bottom, transparent, black ${topInset}, black calc(100% - 2rem), transparent 100%)`,
+          WebkitMaskImage: `linear-gradient(to bottom, transparent, black ${topInset}, black calc(100% - 2rem), transparent 100%)`,
         }}
       >
         <ThreadPrimitive.Empty>

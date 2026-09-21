@@ -27,6 +27,11 @@ import type { ThreadMessage } from "@assistant-ui/react";
  * to `results.length` if `pagination.total` is missing (e.g. very old
  * checkpoints written before pagination existed).
  */
+function scopeMetadata(values: unknown) {
+  const scope = (values as { contextScope?: { type: string; trialIds?: string[] } } | undefined)?.contextScope;
+  return scope?.trialIds ? { scopeType: scope.type, scopeCount: scope.trialIds.length } : {};
+}
+
 function extractTrialCount(values: unknown): number | undefined {
   const activeTrialSearch = (values as { activeTrialSearch?: unknown } | undefined)
     ?.activeTrialSearch as
@@ -87,7 +92,7 @@ export function createThreadListAdapter(
             externalId: t.thread_id,
             title: metadata.title,
             lastMessageAt: t.updated_at ? new Date(t.updated_at) : undefined,
-            custom: { trialCount: resolveTrialCount(t.values, metadata) },
+            custom: { ...metadata.custom, trialCount: resolveTrialCount(t.values, metadata), ...scopeMetadata(t.values) },
           };
         }),
       };
@@ -141,7 +146,7 @@ export function createThreadListAdapter(
         externalId: t.thread_id,
         title: metadata.title,
         lastMessageAt: t.updated_at ? new Date(t.updated_at) : undefined,
-        custom: { trialCount: resolveTrialCount(t.values, metadata) },
+        custom: { ...metadata.custom, trialCount: resolveTrialCount(t.values, metadata), ...scopeMetadata(t.values) },
       };
     },
 

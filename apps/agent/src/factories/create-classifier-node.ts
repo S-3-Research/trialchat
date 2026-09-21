@@ -47,7 +47,7 @@ export function createClassifierNode<TLabel extends string>(
   ) {
     const result = await model.invoke(
       [
-        { role: "system", content: config.systemPrompt },
+        { role: "system", content: config.systemPrompt + (state.contextScope ? "\nThis conversation has a saved trial scope: " + JSON.stringify(state.contextScope) + ". Questions referring to these/saved/selected trials, their eligibility or comparisons are trial_matching." : "") },
         ...state.messages,
       ],
       runConfig

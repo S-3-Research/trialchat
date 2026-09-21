@@ -1,3 +1,4 @@
+import { trialDetailsTool } from "./trial-details.tool.js";
 import { z } from "zod";
 import { knowledgeBaseTool } from "./knowledge-base.tool.js";
 import { webSearchTool } from "./web-search.tool.js";
@@ -69,6 +70,6 @@ export const toolPresets: Record<string, AgentTool[]> = {
   knowledge: hasKnowledgeBase
     ? [tools.knowledgeBase, tools.webSearch]
     : [tools.webSearch],
-  trialMatching: [tools.trialSearch],
+  trialMatching: [tools.trialSearch, trialDetailsTool],
   none: [],
 };

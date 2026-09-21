@@ -25,11 +25,13 @@ export function ChatSurface({
   greeting,
   prompts,
   intakeData,
+  isScoped = false,
 }: {
   placeholder: string;
   greeting: string;
   prompts: ChatStarterPrompt[];
   intakeData: IntakeData | null;
+  isScoped?: boolean;
 }) {
   const aui = useAui();
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -38,10 +40,10 @@ export function ChatSurface({
 
   return (
     <div className="relative flex flex-1 w-full h-full min-h-0">
-      <Thread placeholder={placeholder} greeting={greeting} prompts={prompts} />
+      <Thread placeholder={placeholder} greeting={greeting} prompts={prompts} isScoped={isScoped} />
 
       {/* Top-center CTA — mirrors ChatKit's floating "Find matching trials" pill */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
+      {!isScoped && <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20">
         <button
           onClick={() => (isClinician ? setShowClinicianModal(true) : setShowMatchModal(true))}
           className="flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
@@ -52,9 +54,9 @@ export function ChatSurface({
             {isClinician ? "Screen a patient" : "Find matching trials"}
           </span>
         </button>
-      </div>
+      </div>}
 
-      {showMatchModal && (
+      {!isScoped && showMatchModal && (
         <MatchProfileModal
           onConfirm={(_profile: MatchProfile, message: string) => {
             setShowMatchModal(false);
@@ -64,7 +66,7 @@ export function ChatSurface({
         />
       )}
 
-      {showClinicianModal && (
+      {!isScoped && showClinicianModal && (
         <ClinicianModal
           initialStep="prescreen"
           onConfirm={(message: string) => {

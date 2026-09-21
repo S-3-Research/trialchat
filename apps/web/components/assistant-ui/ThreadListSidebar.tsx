@@ -38,6 +38,8 @@ function ThreadListItem() {
   const trialCount = useAuiState((s) => s.threadListItem.custom?.trialCount) as
     | number
     | undefined;
+  const scopeCount = useAuiState((s) => s.threadListItem.custom?.scopeCount) as number | undefined;
+  const scopeType = useAuiState((s) => s.threadListItem.custom?.scopeType);
   const title = useAuiState((s) => s.threadListItem.title);
   const id = useAuiState((s) => s.threadListItem.id);
   // The runtime uses switch generations so rapid clicks select the latest
@@ -59,6 +61,7 @@ function ThreadListItem() {
         <MessageSquare className="w-4 h-4 shrink-0 opacity-60" strokeWidth={2} />
         <span className="truncate" title={title || "New Chat"}>
           <ThreadListItemPrimitive.Title fallback="New Chat" />
+          {!!scopeCount && <span className="block text-xs font-normal opacity-70">{scopeCount} {scopeType === "bookmark_full_snapshot" ? "bookmarked" : "selected"} {scopeCount === 1 ? "trial" : "trials"}</span>}
         </span>
       </ThreadListItemPrimitive.Trigger>
 

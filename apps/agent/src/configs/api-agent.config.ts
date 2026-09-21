@@ -19,5 +19,6 @@ new broad search.`,
   tools: toolPresets.trialMatching,
   activityLabel: "Finding matching trials",
   maxCallsPerTool: 1,
+  maxCallsByTool: { trial_details: 10 },
   includeActiveTrialSearchContext: true,
 };

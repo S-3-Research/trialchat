@@ -1,5 +1,9 @@
 "use client";
 
+import type { ThreadContextScope } from "@/lib/bookmarks";
+import { BookmarkSnapshotPanel } from "@/components/bookmarks/BookmarkSnapshotPanel";
+import { PanelRight } from "lucide-react";
+import { ThreadNavigation, ThreadScopeHeader } from "@/components/bookmarks/ThreadScope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AssistantRuntimeProvider, ThreadListPrimitive, useAuiState } from "@assistant-ui/react";
 import {
@@ -8,7 +12,7 @@ import {
   type LangChainMessage,
   type UIMessage,
 } from "@assistant-ui/react-langgraph";
-import { PanelLeft, PanelLeftClose, Plus, X } from "lucide-react";
+import { History, Plus, X } from "lucide-react";
 import { createAgentClient, AGENT_ASSISTANT_ID } from "@/lib/agentClient";
 import { createThreadListAdapter } from "@/lib/threadListAdapter";
 import { getOrCreateGuestUserId } from "@/lib/guestId";
@@ -76,6 +80,8 @@ export function AssistantPanel() {
     key?: string;
     remoteId?: string;
     trialState?: TrialSearchState;
+    contextScope?: ThreadContextScope;
+    error?: string;
   }>({});
   const { key: activeThreadKey, remoteId: activeRemoteId, trialState: hydratedTrialState } = activeThread;
   // True while TrialThreadSync is fetching the newly-selected thread's
@@ -93,7 +99,7 @@ export function AssistantPanel() {
   // edits are never lost if the user switches threads without sending
   // another chat message (spec section 3).
   const persistenceAdapter = useMemo<TrialSearchPersistenceAdapter | undefined>(() => {
-    if (!activeRemoteId) return undefined;
+    if (!activeRemoteId || activeThread.contextScope || activeThread.error) return undefined;
     return {
       save: async (payload: PersistedTrialSearch, { signal }) => {
         await client.threads.updateState(activeRemoteId, {
@@ -102,7 +108,7 @@ export function AssistantPanel() {
         });
       },
     };
-  }, [client, activeRemoteId]);
+  }, [client, activeRemoteId, activeThread.contextScope, activeThread.error]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(INTAKE_STORAGE_KEY);
@@ -173,13 +179,14 @@ export function AssistantPanel() {
   return (
     <div className="relative flex flex-1 w-full h-full mx-auto max-w-7xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
+        <ThreadNavigation />
         <TrialThreadSync
           client={client}
-          onThreadSwitch={(key, remoteId, trialState) => {
+          onThreadSwitch={(key, remoteId, trialState, contextScope, error) => {
             // TrialThreadSync follows the runtime's actual selection, including
             // New Chat, deletion and programmatic navigation. Its fetch generation
             // guard discards responses belonging to a previous selection.
-            setActiveThread({ key, remoteId, trialState });
+            setActiveThread({ key, remoteId, trialState, contextScope, error });
           }}
           onRemoteIdAssigned={(key, remoteId) => {
             // Guard: ignore a late-arriving assignment for a thread key the
@@ -197,6 +204,9 @@ export function AssistantPanel() {
             isHydrating={isHydratingTrialState}
           >
             <AssistantPanelBody
+              activeThreadKey={activeThreadKey}
+              contextScope={activeThread.contextScope}
+              hydrationError={activeThread.error}
               isMobile={isMobile}
               sidebarOpen={sidebarOpen}
               setSidebarOpen={setSidebarOpen}
@@ -221,7 +231,9 @@ function TrialThreadSync({
   onThreadSwitch: (
     key: string | undefined,
     remoteId: string | undefined,
-    trialState: TrialSearchState | undefined
+    trialState: TrialSearchState | undefined,
+    contextScope?: ThreadContextScope,
+    error?: string
   ) => void;
   onRemoteIdAssigned: (key: string, remoteId: string) => void;
   onHydratingChange: (isHydrating: boolean) => void;
@@ -264,12 +276,14 @@ function TrialThreadSync({
     let cancelled = false;
     onHydratingChangeRef.current(true);
     client.threads
-      .getState<{ activeTrialSearch?: PersistedTrialSearch }>(currentRemoteId)
+      .getState<{ activeTrialSearch?: PersistedTrialSearch; contextScope?: ThreadContextScope }>(currentRemoteId)
       .then((state) => {
         if (cancelled || seq !== seqRef.current) return;
-        const trialState = fromPersistedTrialSearch(state.values.activeTrialSearch);
+        const scope = state.values.contextScope;
+        const frozen = scope?.type === "bookmark_full_snapshot" || scope?.type === "bookmark_picked_snapshot";
+        const trialState = fromPersistedTrialSearch(frozen ? undefined : state.values.activeTrialSearch);
         onHydratingChangeRef.current(false);
-        onThreadSwitchRef.current(id, currentRemoteId, trialState);
+        onThreadSwitchRef.current(id, currentRemoteId, trialState, scope);
       })
       .catch((error) => {
         if (cancelled || seq !== seqRef.current) return;
@@ -277,7 +291,7 @@ function TrialThreadSync({
         onHydratingChangeRef.current(false);
         // Still switch the Provider to this thread (empty/idle state) so the
         // Panel doesn't keep showing a stale, different thread's search.
-        onThreadSwitchRef.current(id, currentRemoteId, undefined);
+        onThreadSwitchRef.current(id, currentRemoteId, undefined, undefined, "Could not load this conversation’s trials. Reload to retry.");
       });
     return () => {
       cancelled = true;
@@ -300,6 +314,9 @@ function TrialThreadSync({
 }
 
 function AssistantPanelBody({
+  activeThreadKey,
+  contextScope,
+  hydrationError,
   isMobile,
   sidebarOpen,
   setSidebarOpen,
@@ -307,6 +324,9 @@ function AssistantPanelBody({
   prompts,
   intakeData,
 }: {
+  activeThreadKey?: string;
+  contextScope?: ThreadContextScope;
+  hydrationError?: string;
   isMobile: boolean;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -314,7 +334,21 @@ function AssistantPanelBody({
   prompts: ReturnType<typeof toChatStarterPrompts>;
   intakeData: IntakeData | null;
 }) {
-  const { panelOpen: trialPanelOpen, closePanel: closeTrialPanel } = useTrialSearch();
+  const { panelOpen: trialPanelOpen, closePanel: closeTrialPanel, openPanel, isHydrating } = useTrialSearch();
+  const runtimeKey = useAuiState((s) => s.optional.threadListItem?.id);
+  const loading = isHydrating || runtimeKey !== activeThreadKey;
+  const scope = !loading && contextScope && contextScope.type !== "trial_search" ? contextScope : undefined;
+  const openedSnapshotRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (scope && !isMobile && openedSnapshotRef.current !== activeThreadKey) {
+      openedSnapshotRef.current = activeThreadKey;
+      openPanel();
+    }
+  }, [scope, isMobile, activeThreadKey, openPanel]);
+  const panel = loading ? <p role="status" className="p-6 text-sm text-slate-500">Loading conversation trials…</p>
+    : hydrationError ? <p role="alert" className="p-6 text-sm text-red-600">{hydrationError}</p>
+    : scope ? (trialPanelOpen ? <BookmarkSnapshotPanel key={activeThreadKey} scope={scope} onClose={closeTrialPanel} /> : null)
+    : <TrialPanel />;
 
   // At medium widths keep the newly opened panel. On a resize from the
   // three-column layout, prefer the Trial Panel rather than closing both.
@@ -352,7 +386,7 @@ function AssistantPanelBody({
                 aria-label="Collapse chat history"
                 className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <PanelLeftClose className="w-4 h-4" strokeWidth={2} />
+                <History className="w-4 h-4" strokeWidth={2} />
               </button>
             </div>
             <div className="flex-1 min-h-0">
@@ -410,7 +444,7 @@ function AssistantPanelBody({
                 aria-label="Open chat history"
                 className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
-                <PanelLeft className="w-4 h-4" strokeWidth={2} />
+                <History className="w-4 h-4" strokeWidth={2} />
               </button>
               <ThreadListPrimitive.New asChild>
                 <button
@@ -422,13 +456,15 @@ function AssistantPanelBody({
               </ThreadListPrimitive.New>
             </div>
           )}
-          <ChatSurface
-            placeholder={PLACEHOLDER_INPUT}
-            greeting={greeting}
-            prompts={prompts}
+          {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} bothPanelsOpen={sidebarOpen && trialPanelOpen} />}
+          {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
+            isScoped={!!scope}
+            placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
+            greeting={scope ? (scope.trialIds.length === 1 ? "Discuss this trial" : `Discuss these ${scope.trialIds.length} trials`) : greeting}
+            prompts={scope ? [] : prompts}
             intakeData={intakeData}
-          />
-          <TrialPanelTrigger />
+          />}
+          {!loading && !hydrationError && (scope ? (!trialPanelOpen && <button onClick={openPanel} aria-label="Open conversation trials" className="absolute top-4 right-4 z-20 flex items-center gap-2 h-12 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300"><PanelRight className="h-4 w-4" />Trials {scope.trialIds.length}</button>) : <TrialPanelTrigger />)}
         </div>
 
         {/*
@@ -444,7 +480,7 @@ function AssistantPanelBody({
           }`}
           style={{ width: trialPanelOpen ? `${TRIAL_PANEL_WIDTH_PERCENT}%` : 0 }}
         >
-          <TrialPanel />
+          {!isMobile && panel}
         </div>
 
         {isMobile && trialPanelOpen && (
@@ -454,12 +490,12 @@ function AssistantPanelBody({
               className="h-full bg-white dark:bg-[#181D26] border-l border-slate-200/70 dark:border-slate-700/60"
               style={{ width: TRIAL_PANEL_MOBILE_WIDTH }}
             >
-              <TrialPanel />
+              {panel}
             </div>
           </div>
         )}
 
-        <TrialSearchChatBridge />
+        {!loading && !hydrationError && !scope && <TrialSearchChatBridge />}
     </>
   );
 }

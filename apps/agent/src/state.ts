@@ -1,3 +1,5 @@
+import { preserveTrialScope } from "./lib/trial-scope.js";
+import type { ThreadContextScope } from "@acadia/shared-types";
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 import {
   uiMessageReducer,
@@ -23,6 +25,10 @@ export type Intent = "knowledge" | "trial_matching" | "other";
  */
 export const AgentState = Annotation.Root({
   ...MessagesAnnotation.spec,
+  contextScope: Annotation<ThreadContextScope | undefined>({
+    reducer: preserveTrialScope,
+    default: () => undefined,
+  }),
   // Free-form context passed in from the web app at session start
   // (e.g. intake answers: role, response_style, intent).
   userContext: Annotation<Record<string, unknown>>({
