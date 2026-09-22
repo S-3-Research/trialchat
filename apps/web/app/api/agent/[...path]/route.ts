@@ -8,6 +8,13 @@ const AGENT_BASE_URL =
   process.env.LANGGRAPH_API_URL?.replace(/\/+$/, "") ||
   "http://localhost:2024";
 
+// Optional bearer/API key forwarded to the upstream agent server. Needed
+// when the agent is deployed somewhere that requires auth (e.g. LangGraph
+// Platform), where every request must carry `x-api-key`. Left unset for
+// self-hosted/Docker-network deployments where the agent has no auth layer
+// of its own — this is purely additive so existing setups are unaffected.
+const AGENT_API_KEY = process.env.LANGGRAPH_API_KEY;
+
 /**
  * Same-origin proxy for the LangGraph Agent Server.
  *
@@ -33,6 +40,7 @@ async function handleRequest(
       method,
       headers: {
         "Content-Type": req.headers.get("content-type") ?? "application/json",
+        ...(AGENT_API_KEY ? { "x-api-key": AGENT_API_KEY } : {}),
       },
     };
     if (method !== "GET" && method !== "HEAD") {
