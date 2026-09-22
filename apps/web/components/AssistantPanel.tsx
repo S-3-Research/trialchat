@@ -10,6 +10,7 @@ import {
 } from "@assistant-ui/react-langgraph";
 import { PanelLeft, PanelLeftClose, Plus, X } from "lucide-react";
 import { createAgentClient, AGENT_ASSISTANT_ID } from "@/lib/agentClient";
+import { debugAgentStream } from "@/lib/debugAgentStream";
 import { createThreadListAdapter } from "@/lib/threadListAdapter";
 import { getOrCreateGuestUserId } from "@/lib/guestId";
 import { ChatSurface } from "@/components/assistant-ui/ChatSurface";
@@ -131,10 +132,10 @@ export function AssistantPanel() {
 
   const stream = useMemo(
     () =>
-      unstable_createLangGraphStream({
+      debugAgentStream(unstable_createLangGraphStream({
         client,
         assistantId: AGENT_ASSISTANT_ID,
-      }),
+      })),
     [client]
   );
 
@@ -463,4 +464,3 @@ function AssistantPanelBody({
     </>
   );
 }
-
