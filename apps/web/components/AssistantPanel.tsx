@@ -135,6 +135,9 @@ export function AssistantPanel() {
       debugAgentStream(unstable_createLangGraphStream({
         client,
         assistantId: AGENT_ASSISTANT_ID,
+        // Use the native message tuple stream so streamed chunks and the
+        // final reply share a stable ID with the attached suggestions UI.
+        streamMode: ["messages-tuple", "updates", "custom"],
       })),
     [client]
   );
