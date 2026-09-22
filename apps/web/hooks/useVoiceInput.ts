@@ -1,17 +1,23 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-// Type definitions for Web Speech API
-interface SpeechRecognitionEvent extends Event {
+// Type definitions for Web Speech API.
+// Named with a `TC` (TrialChat) prefix rather than the bare `SpeechRecognition*`
+// names, since some TypeScript `lib.dom.d.ts` versions now ship their own
+// (differently-modifiered) global `SpeechRecognition` declarations, and
+// re-declaring the same global name with different modifiers is a hard
+// compile error ("All declarations of 'X' must have identical modifiers").
+// Prefixing sidesteps that entirely regardless of the lib/TS version in use.
+interface TCSpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
   resultIndex: number;
 }
 
-interface SpeechRecognitionErrorEvent extends Event {
+interface TCSpeechRecognitionErrorEvent extends Event {
   error: string;
   message: string;
 }
 
-interface SpeechRecognition extends EventTarget {
+interface TCSpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
@@ -19,18 +25,18 @@ interface SpeechRecognition extends EventTarget {
   start(): void;
   stop(): void;
   abort(): void;
-  onaudiostart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onaudioend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
-  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onaudiostart: ((this: TCSpeechRecognition, ev: Event) => void) | null;
+  onaudioend: ((this: TCSpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: TCSpeechRecognition, ev: Event) => void) | null;
+  onerror: ((this: TCSpeechRecognition, ev: TCSpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((this: TCSpeechRecognition, ev: TCSpeechRecognitionEvent) => void) | null;
+  onstart: ((this: TCSpeechRecognition, ev: Event) => void) | null;
 }
 
 declare global {
   interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
+    SpeechRecognition?: new () => TCSpeechRecognition;
+    webkitSpeechRecognition?: new () => TCSpeechRecognition;
   }
 }
 
@@ -57,7 +63,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
   const [isSupported, setIsSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<TCSpeechRecognition | null>(null);
 
   // Check browser support on mount
   useEffect(() => {
@@ -76,8 +82,14 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
     }
 
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
+      const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognitionCtor) {
+        const errorMsg = 'Speech recognition is not supported in this browser. Please use Chrome, Safari, or Edge.';
+        setError(errorMsg);
+        onError?.(errorMsg);
+        return;
+      }
+      const recognition = new SpeechRecognitionCtor();
       
       console.log('[useVoiceInput] SpeechRecognition created');
 
@@ -94,7 +106,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         setInterimTranscript('');
       };
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
+      recognition.onresult = (event: TCSpeechRecognitionEvent) => {
         let finalText = '';
         let interimText = '';
 
@@ -120,7 +132,7 @@ export function useVoiceInput(options: UseVoiceInputOptions = {}) {
         }
       };
 
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      recognition.onerror = (event: TCSpeechRecognitionErrorEvent) => {
         console.error('Speech recognition error:', event.error);
         
         let errorMsg = 'An error occurred during speech recognition.';

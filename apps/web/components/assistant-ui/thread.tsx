@@ -1,6 +1,6 @@
 "use client";
 
-import type { FC } from "react";
+import type { FC, ComponentProps } from "react";
 import {
   ThreadPrimitive,
   ComposerPrimitive,
@@ -17,7 +17,6 @@ import {
   Search,
   NotebookText,
   CircleHelp,
-  Sparkles,
   Mic,
 } from "lucide-react";
 import type { ChatStarterPrompt } from "@/lib/types/prompts";
@@ -197,11 +196,23 @@ const AssistantMessage: FC = () => {
                 }
                 switch (part.toolName) {
                   case "trial_search":
-                    return <GetTrialsToolUI {...(part as any)} />;
+                    return (
+                      <GetTrialsToolUI
+                        {...(part as unknown as ComponentProps<typeof GetTrialsToolUI>)}
+                      />
+                    );
                   case "web_search":
-                    return <WebSearchToolUI {...(part as any)} />;
+                    return (
+                      <WebSearchToolUI
+                        {...(part as unknown as ComponentProps<typeof WebSearchToolUI>)}
+                      />
+                    );
                   case "knowledge_base":
-                    return <KnowledgeBaseToolUI {...(part as any)} />;
+                    return (
+                      <KnowledgeBaseToolUI
+                        {...(part as unknown as ComponentProps<typeof KnowledgeBaseToolUI>)}
+                      />
+                    );
                   default:
                     return <ToolCallFallback toolName={part.toolName} status={part.status} />;
                 }

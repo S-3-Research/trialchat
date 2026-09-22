@@ -18,14 +18,23 @@ export type ChatStarterPrompt = {
 };
 
 /** Converts ExtendedStartScreenPrompt[] (from lib/config.ts) to the
- * chatkit-independent shape used by the assistant-ui Thread component. */
+ * chatkit-independent shape used by the assistant-ui Thread component.
+ * ChatKit's `prompt` field can be a plain string or a `UserMessageContent[]`
+ * (rich content parts); assistant-ui's starter prompts only ever need plain
+ * text, so non-string prompts are flattened to their text parts joined
+ * together (falling back to an empty string if there's no text content). */
 export const toChatStarterPrompts = (
   prompts: ExtendedStartScreenPrompt[],
   isMobile: boolean
 ): ChatStarterPrompt[] =>
   prompts.map(({ label, prompt, short, icon }) => ({
     label: isMobile ? short : label,
-    prompt,
+    prompt:
+      typeof prompt === "string"
+        ? prompt
+        : prompt
+            .map((part) => ("text" in part ? part.text : ""))
+            .join(""),
     icon,
   }));
 
