@@ -14,6 +14,7 @@ import {
 } from "@assistant-ui/react-langgraph";
 import { History, Plus, X } from "lucide-react";
 import { createAgentClient, AGENT_ASSISTANT_ID } from "@/lib/agentClient";
+import { debugAgentStream } from "@/lib/debugAgentStream";
 import { createThreadListAdapter } from "@/lib/threadListAdapter";
 import { getOrCreateGuestUserId } from "@/lib/guestId";
 import { ChatSurface } from "@/components/assistant-ui/ChatSurface";
@@ -137,10 +138,13 @@ export function AssistantPanel() {
 
   const stream = useMemo(
     () =>
-      unstable_createLangGraphStream({
+      debugAgentStream(unstable_createLangGraphStream({
         client,
         assistantId: AGENT_ASSISTANT_ID,
-      }),
+        // Use the native message tuple stream so streamed chunks and the
+        // final reply share a stable ID with the attached suggestions UI.
+        streamMode: ["messages-tuple", "updates", "custom"],
+      })),
     [client]
   );
 
@@ -499,4 +503,3 @@ function AssistantPanelBody({
     </>
   );
 }
-
