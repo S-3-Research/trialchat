@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Home, FileText, UserCog, Settings } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useColorScheme } from "@/contexts/ColorSchemeContext";
 import { useFontSize } from "@/contexts/FontSizeContext";
@@ -242,10 +242,6 @@ export default function Header() {
                 </DropdownMenu.Portal>
             </DropdownMenu.Root>
         </nav>
-        <Link href="/trial-chat/bookmarks" aria-label="Bookmarks" className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/5">
-          <Bookmark className="w-5 h-5" strokeWidth={1.5} />
-        </Link>
-
         {/* Divider */}
         <div className="mr-4 h-5 w-[1px] bg-slate-300 dark:bg-white/10 hidden md:block"></div>
 
@@ -260,9 +256,36 @@ export default function Header() {
              </DropdownMenu.Trigger>
              <DropdownMenu.Portal>
                 <DropdownMenu.Content className="z-[60] min-w-[200px] rounded-xl border py-2 shadow-xl border-slate-200 bg-white/95 backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/95" align="end">
-                  <DropdownMenu.Item asChild><Link href="/" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Home</Link></DropdownMenu.Item>
-                  <DropdownMenu.Item asChild><Link href="/trial-chat/personalization" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Personalization</Link></DropdownMenu.Item>
-                  <DropdownMenu.Item asChild><Link href="/trial-chat/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Settings</Link></DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <Home className="w-4 h-4" strokeWidth={1.5} />
+                      Home
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/trial-chat/docs" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <FileText className="w-4 h-4" strokeWidth={1.5} />
+                      Docs
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/trial-chat/bookmarks" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <Bookmark className="w-4 h-4" strokeWidth={1.5} />
+                      Bookmarks
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/trial-chat/personalization" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <UserCog className="w-4 h-4" strokeWidth={1.5} />
+                      Personalization
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/trial-chat/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <Settings className="w-4 h-4" strokeWidth={1.5} />
+                      Settings
+                    </Link>
+                  </DropdownMenu.Item>
                 </DropdownMenu.Content>
              </DropdownMenu.Portal>
         </DropdownMenu.Root>
