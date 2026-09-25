@@ -45,6 +45,12 @@ export type AgentNodeConfig = {
   // sets this today; the knowledge/other-questions branches have no use
   // for trial-search context and skip the extra tokens entirely.
   includeActiveTrialSearchContext?: boolean;
+  // When true, splice `state.userContext` (if present/non-empty) in as a
+  // system-role context message — see the doc comment on that field in
+  // state.ts. Staged by `IntakeContextBridge.tsx` from the one-time
+  // intake form (role/intent/response_style), so the model can adjust
+  // tone/detail without re-asking or bloating persisted message history.
+  includeUserContext?: boolean;
 };
 
 const MAX_TOOL_ITERATIONS = 4;
@@ -98,6 +104,16 @@ export function createAgentNode(config: AgentNodeConfig) {
           (selectedTrials?.length
             ? "\n\nIMPORTANT: the user has pinned the trial(s) above in `selectedTrials` (shown in the UI as \"Re: <trial title>\" pills on their message composer). If their next message doesn't otherwise name a different trial or ask to start a new search, treat it as scoped ONLY to these pinned trial(s) — answer using just their data, don't fall back to summarizing the full `results` list."
             : ""),
+      });
+    }
+
+    if (!frozen && config.includeUserContext && state.userContext && Object.keys(state.userContext).length > 0) {
+      messages.push({
+        role: "system" as const,
+        content:
+          "User context (collected once via a short intake form; treat as a soft preference, not a hard constraint):\n" +
+          JSON.stringify(state.userContext, null, 2) +
+          "\n\nAdjust your tone and level of detail accordingly (e.g. more clinical/technical for role=clinician, plainer language for role=patient/caregiver; match response_style if provided).",
       });
     }
 

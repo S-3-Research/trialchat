@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Bookmark, Home, FileText, UserCog, Settings } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useColorScheme } from "@/contexts/ColorSchemeContext";
 import { useFontSize } from "@/contexts/FontSizeContext";
 import { useVoiceInputMode } from "@/contexts/VoiceInputModeContext";
-import { INTAKE_STORAGE_KEY } from "@/lib/types/intake";
 
 // Set to true to re-enable sign-in, false to show "coming soon" notice
 const SIGN_IN_ENABLED = false;
@@ -15,48 +14,9 @@ const SIGN_IN_ENABLED = false;
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [showSignInNotice, setShowSignInNotice] = useState(false);
-  const [isClinicianMode, setIsClinicianMode] = useState(false);
   const { preference, setPreference } = useColorScheme();
   const { fontSize, setFontSize } = useFontSize();
   const { mode, setMode } = useVoiceInputMode();
-
-  // Detect clinician role from localStorage
-  useEffect(() => {
-    const checkClinicianRole = () => {
-      if (typeof window === "undefined") return;
-      const stored = localStorage.getItem(INTAKE_STORAGE_KEY);
-      if (stored) {
-        try {
-          const data = JSON.parse(stored);
-          setIsClinicianMode(data.role === "clinician");
-        } catch {
-          setIsClinicianMode(false);
-        }
-      } else {
-        setIsClinicianMode(false);
-      }
-    };
-
-    checkClinicianRole();
-
-    // Cross-tab storage changes
-    window.addEventListener("storage", checkClinicianRole);
-    // Same-tab: after intake completes or role changes
-    window.addEventListener("intake-role-updated", checkClinicianRole);
-
-    return () => {
-      window.removeEventListener("storage", checkClinicianRole);
-      window.removeEventListener("intake-role-updated", checkClinicianRole);
-    };
-  }, []);
-
-  const handleExitClinicianMode = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(INTAKE_STORAGE_KEY);
-    }
-    setIsClinicianMode(false);
-    window.dispatchEvent(new CustomEvent("clinician-mode-exited"));
-  };
 
   const toggleTheme = () => {
     setPreference(preference === "dark" ? "light" : "dark");
@@ -339,27 +299,6 @@ export default function Header() {
         </div>
       </div>
     </header>
-
-    {/* Clinician Mode Banner */}
-    {isClinicianMode && (
-      <div className="flex-none w-full bg-emerald-600 dark:bg-emerald-700 text-white z-40">
-        <div className="mx-auto max-w-7xl w-[95%] flex items-center justify-between gap-3 py-2 px-1">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-sm font-semibold tracking-wide">Clinician Mode</span>
-            <span className="hidden sm:inline text-sm text-emerald-100">— viewing as a healthcare professional</span>
-          </div>
-          <button
-            onClick={handleExitClinicianMode}
-            className="flex items-center gap-1.5 text-xs font-medium text-emerald-100 hover:text-white transition-colors whitespace-nowrap underline underline-offset-2 decoration-emerald-300 hover:decoration-white"
-          >
-            Exit clinician mode
-          </button>
-        </div>
-      </div>
-    )}
     </>
   );
 }

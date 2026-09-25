@@ -21,4 +21,5 @@ new broad search.`,
   maxCallsPerTool: 1,
   maxCallsByTool: { trial_details: 10 },
   includeActiveTrialSearchContext: true,
+  includeUserContext: true,
 };

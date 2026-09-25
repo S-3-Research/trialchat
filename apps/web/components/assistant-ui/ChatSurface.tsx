@@ -1,30 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useAui } from "@assistant-ui/react";
-import { Zap } from "lucide-react";
 import { Thread } from "@/components/assistant-ui/thread";
-import { MatchProfileModal } from "@/components/MatchProfileModal";
-import type { MatchProfile } from "@/components/MatchProfileModal";
-import { ClinicianModal } from "@/components/ClinicianModal";
 import type { IntakeData } from "@/lib/types/intake";
 import type { ChatStarterPrompt } from "@/lib/types/prompts";
 
 /**
- * Sits inside <AssistantRuntimeProvider>, so it can call useAui() to reach
- * the thread/composer clients. Wires up the pieces that live outside the
- * pure assistant-ui primitives: the Match/Clinician profile modals, which
- * send a message on confirm via aui.thread.append() (mirroring ChatKit's
- * chatkit.sendUserMessage). Voice input is handled natively by the composer
- * itself (ComposerPrimitive.Dictate, see thread.tsx) via the runtime's
- * DictationAdapter (see lib/voiceDictationAdapters.ts), so no custom voice
- * button wiring is needed here.
+ * Pure chat surface. The "Find matching trials" CTA (desktop pill +
+ * mobile icon), Trial Panel trigger, and their Match/Clinician profile
+ * modals now all live in AssistantPanel.tsx (AssistantPanelBody) — grouped
+ * together in a shared floating-controls row so fixed-width buttons never
+ * overlap the trigger regardless of how wide its "Trials N" label gets.
  */
 export function ChatSurface({
   placeholder,
   greeting,
   prompts,
-  intakeData,
   isScoped = false,
 }: {
   placeholder: string;
@@ -33,56 +23,9 @@ export function ChatSurface({
   intakeData: IntakeData | null;
   isScoped?: boolean;
 }) {
-  const aui = useAui();
-  const [showMatchModal, setShowMatchModal] = useState(false);
-  const [showClinicianModal, setShowClinicianModal] = useState(false);
-  const isClinician = intakeData?.role === "clinician";
-
   return (
     <div className="relative flex flex-1 w-full h-full min-h-0">
       <Thread placeholder={placeholder} greeting={greeting} prompts={prompts} isScoped={isScoped} />
-
-      {/*
-       * "Find matching trials" CTA — mirrors ChatKit's floating pill on
-       * desktop (centered top). On small screens there isn't room for a
-       * centered labeled pill alongside the Trial Panel trigger (also
-       * top-right), so it shrinks to an icon-only circle and docks just
-       * to the left of that trigger instead.
-       */}
-      {!isScoped && <div className="absolute top-4 right-20 md:right-auto md:left-1/2 md:-translate-x-1/2 z-20">
-        <button
-          onClick={() => (isClinician ? setShowClinicianModal(true) : setShowMatchModal(true))}
-          className="flex items-center justify-center gap-2 w-12 h-12 md:w-auto md:h-12 md:px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
-          aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
-          title={isClinician ? "Screen a patient" : "Find matching trials"}
-        >
-          <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
-          <span className="hidden md:inline font-semibold text-sm text-blue-600">
-            {isClinician ? "Screen a patient" : "Find matching trials"}
-          </span>
-        </button>
-      </div>}
-
-      {!isScoped && showMatchModal && (
-        <MatchProfileModal
-          onConfirm={(_profile: MatchProfile, message: string) => {
-            setShowMatchModal(false);
-            aui.thread.append(message);
-          }}
-          onClose={() => setShowMatchModal(false)}
-        />
-      )}
-
-      {!isScoped && showClinicianModal && (
-        <ClinicianModal
-          initialStep="prescreen"
-          onConfirm={(message: string) => {
-            setShowClinicianModal(false);
-            aui.thread.append(message);
-          }}
-          onClose={() => setShowClinicianModal(false)}
-        />
-      )}
     </div>
   );
 }

@@ -370,6 +370,8 @@ body {
 }
 
 .shimmer-border-btn {
+  position: relative;
+  isolation: isolate;
   background: conic-gradient(from var(--shimmer-angle, 0deg) at 50% 50%, #2563eb 0%, #38bdf8 40%, #7dd3fc 50%, #38bdf8 60%, #2563eb 100%);
   animation: shimmer-border-spin 1.8s linear infinite;
   padding: 2px;
@@ -377,10 +379,31 @@ body {
 }
 
 .shimmer-border-btn-pill {
+  position: relative;
+  isolation: isolate;
   background: conic-gradient(from var(--shimmer-angle, 0deg) at 50% 50%, #2563eb 0%, #38bdf8 40%, #7dd3fc 50%, #38bdf8 60%, #2563eb 100%);
   animation: shimmer-border-spin 1.8s linear infinite;
   padding: 2px;
   border-radius: 9999px;
+}
+
+/*
+ * The spinning conic-gradient background above promotes to its own GPU
+ * compositing layer (continuous `animation`), independent from whatever
+ * layer the modal card ancestor gets from ITS OWN transform/opacity
+ * animation (`.animate-modal-card-in`, globals.css below). During that
+ * ~220ms entrance, the two layers can briefly composite in the wrong
+ * paint order — the spinning gradient flashes on top of the inner
+ * button's `bg-clip-text` gradient text (also its own layer) instead of
+ * staying behind it. `isolation: isolate` above scopes a stacking
+ * context to the shimmer wrapper; explicitly giving the inner button a
+ * higher z-index within that context pins it above the gradient layer
+ * regardless of ancestor animation timing.
+ */
+.shimmer-border-btn > button,
+.shimmer-border-btn-pill > button {
+  position: relative;
+  z-index: 1;
 }
 
 /* Trial Panel — "being asked about" card border pulse (green), used while

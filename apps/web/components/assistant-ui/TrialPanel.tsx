@@ -329,7 +329,15 @@ export function TrialPanel() {
   );
 }
 
-/** Floating trigger shown when the Trial Panel is collapsed. */
+/**
+ * Trigger shown when the Trial Panel is collapsed. Unlike most floating
+ * controls in this app, this is NOT self-positioned — it's meant to be
+ * rendered inside a shared `absolute top-4 right-4 flex items-center gap-2`
+ * row alongside the mobile "Find matching trials" CTA icon (see
+ * AssistantPanelBody in AssistantPanel.tsx), so a widening "Trials N"
+ * label here can never overlap a sibling with its own independent
+ * absolute position.
+ */
 export function TrialPanelTrigger() {
   const { panelOpen, openPanel, search } = useTrialSearch();
   if (panelOpen) return null;
@@ -338,7 +346,7 @@ export function TrialPanelTrigger() {
     <button
       onClick={openPanel}
       aria-label="Open trial panel"
-      className="absolute top-4 right-4 z-20 flex items-center justify-center gap-1.5 h-12 px-4 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+      className="flex items-center justify-center gap-1.5 h-12 px-4 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
     >
       <PanelRight className="w-4 h-4" strokeWidth={2} />
       {count > 0 && (

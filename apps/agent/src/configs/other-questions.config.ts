@@ -25,4 +25,5 @@ as an unrelated/off-topic message.`,
   // trial can land here too depending on phrasing, so don't leave this
   // branch blind to the Trial Panel's current state.
   includeActiveTrialSearchContext: true,
+  includeUserContext: true,
 };

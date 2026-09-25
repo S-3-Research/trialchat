@@ -35,4 +35,5 @@ data, even if the question itself doesn't name them.`,
   // trial(s) the user actually selected/is asking about (see the doc
   // comment on `activeTrialSearch` in state.ts).
   includeActiveTrialSearchContext: true,
+  includeUserContext: true,
 };

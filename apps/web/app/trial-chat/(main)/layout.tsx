@@ -1,5 +1,6 @@
 import Header from "@/components/Header";
 import TestModeBanner from "@/components/TestModeBanner";
+import ClinicianModeBanner from "@/components/ClinicianModeBanner";
 
 export default function MainLayout({
   children,
@@ -20,6 +21,7 @@ export default function MainLayout({
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full w-full">
         <TestModeBanner />
+        <ClinicianModeBanner />
         <Header />
         <main className="flex-1 min-h-0 flex flex-col relative overflow-hidden">
             {children}

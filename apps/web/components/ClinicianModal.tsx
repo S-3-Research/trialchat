@@ -41,6 +41,10 @@ export function ClinicianModal({ onClose, initialStep = "intent", onConfirm }: C
     };
     if (typeof window !== "undefined") {
       localStorage.setItem(INTAKE_STORAGE_KEY, JSON.stringify(data));
+      // Same-tab `storage` events don't fire for the tab that wrote the
+      // change — without this, Header's clinician-role check (and
+      // ClinicianModeBanner) wouldn't show "Clinician Mode" until a reload.
+      window.dispatchEvent(new CustomEvent("intake-role-updated"));
     }
   };
 

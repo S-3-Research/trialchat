@@ -21,7 +21,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-      <html lang="en" className={cn("text-base", "font-sans", geist.variable)}>
+      <html
+        lang="en"
+        className={cn("text-base", "font-sans", geist.variable)}
+        // ThemeScript (in <head>) sets data-color-scheme / style.colorScheme
+        // on this element synchronously before React hydrates, based on
+        // localStorage/matchMedia — values the server can't know ahead of
+        // time. That's an intentional, expected mismatch (not a bug), so
+        // tell React to skip diffing this node's attributes on hydration.
+        suppressHydrationWarning
+      >
         <head>
           <ThemeScript />
           <Script

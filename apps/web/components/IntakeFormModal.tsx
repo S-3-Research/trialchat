@@ -37,6 +37,11 @@ export function IntakeFormModal({ onComplete, onSkip }: IntakeFormModalProps) {
       ...overrides,
     };
     localStorage.setItem(INTAKE_STORAGE_KEY, JSON.stringify(data));
+    // Same-tab `storage` events don't fire for the tab that wrote the
+    // change, so listeners like Header's clinician-role check (and now
+    // ClinicianModeBanner) need this explicit signal to update without a
+    // reload.
+    window.dispatchEvent(new CustomEvent("intake-role-updated"));
     onComplete(data);
   };
 

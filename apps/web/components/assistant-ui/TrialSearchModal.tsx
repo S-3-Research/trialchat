@@ -372,18 +372,28 @@ export function TrialSearchModal({
                 <button
                   onClick={handleSubmit}
                   disabled={!canSubmit}
-                  className="group w-full focus:outline-none py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="group w-full focus:outline-none py-3 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:cursor-not-allowed disabled:hover:bg-white dark:disabled:hover:bg-slate-900"
                   style={{ borderRadius: "10px" }}
                 >
-                  <svg className="w-4 h-4 text-blue-600 fill-current" viewBox="0 0 24 24">
-                    <path d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <span className="bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
-                    {mode === "new" ? "Start New Search" : "Apply Filters"}
+                  {/*
+                   * Fade only the icon/text (not the button itself) when
+                   * disabled — `disabled:opacity-40` on the button used to
+                   * fade its own `bg-white`/`bg-slate-900` background too,
+                   * letting the spinning shimmer-border gradient show
+                   * through as a translucent blue haze over the "disabled"
+                   * state (the mask the button never fully covers).
+                   */}
+                  <span className="flex items-center justify-center gap-2 text-sm font-bold group-disabled:opacity-40">
+                    <svg className="w-4 h-4 text-blue-600 fill-current" viewBox="0 0 24 24">
+                      <path d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
+                      {mode === "new" ? "Start New Search" : "Apply Filters"}
+                    </span>
+                    <svg className="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
                   </span>
-                  <svg className="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                  </svg>
                 </button>
               </div>
             </div>

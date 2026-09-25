@@ -2,10 +2,10 @@
 
 import type { ThreadContextScope } from "@/lib/bookmarks";
 import { BookmarkSnapshotPanel } from "@/components/bookmarks/BookmarkSnapshotPanel";
-import { PanelRight } from "lucide-react";
+import { PanelRight, Zap } from "lucide-react";
 import { ThreadNavigation, ThreadScopeHeader } from "@/components/bookmarks/ThreadScope";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AssistantRuntimeProvider, ThreadListPrimitive, useAuiState } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, ThreadListPrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import {
   unstable_createLangGraphStream,
   useLangGraphRuntime,
@@ -21,6 +21,11 @@ import { ChatSurface } from "@/components/assistant-ui/ChatSurface";
 import { ThreadListSidebar } from "@/components/assistant-ui/ThreadListSidebar";
 import { SuggestionsWidget } from "@/components/assistant-ui/tool-ui";
 import { TrialSearchChatBridge } from "@/components/assistant-ui/TrialSearchChatBridge";
+import { withUserContext } from "@/lib/withUserContext";
+import { IntakeFormModal } from "@/components/IntakeFormModal";
+import { MatchProfileModal } from "@/components/MatchProfileModal";
+import type { MatchProfile } from "@/components/MatchProfileModal";
+import { ClinicianModal } from "@/components/ClinicianModal";
 import {
   TrialPanel,
   TrialPanelTrigger,
@@ -68,6 +73,12 @@ export function AssistantPanel() {
   const client = useMemo(() => createAgentClient(), []);
   const isMobile = useIsMobile();
   const [intakeData, setIntakeData] = useState<IntakeData | null>(null);
+  // Mirrors `intakeData` for `stream`'s withUserContext getter (see above),
+  // which must read the *current* value without `stream` depending on
+  // `intakeData` directly (that would recreate `stream`/`runtime` on every
+  // intake change, tearing down the active run).
+  const intakeDataRef = useRef<IntakeData | null>(null);
+  intakeDataRef.current = intakeData;
   // Sidebar defaults to collapsed on both desktop and mobile — a slide-out
   // panel toggled via the PanelLeft trigger (see the floating top-left
   // controls below) rather than a permanently-docked column, so the chat
@@ -111,15 +122,44 @@ export function AssistantPanel() {
     };
   }, [client, activeRemoteId, activeThread.contextScope, activeThread.error]);
 
+  // Whether the intake form (goal/role/tone) still needs to be shown —
+  // mirrors App.tsx's v1 behavior so v2 gets the same first-visit intake
+  // flow. `null` means "not checked yet" (avoids a flash of the modal
+  // before the initial localStorage read resolves).
+  const [showIntakeModal, setShowIntakeModal] = useState<boolean | null>(null);
+
   useEffect(() => {
     const stored = window.localStorage.getItem(INTAKE_STORAGE_KEY);
-    if (!stored) return;
+    if (!stored) {
+      setShowIntakeModal(true);
+      return;
+    }
     try {
       setIntakeData(JSON.parse(stored));
+      setShowIntakeModal(false);
     } catch (error) {
       console.error("[AssistantPanel] Failed to parse intake data:", error);
+      setShowIntakeModal(true);
     }
   }, []);
+
+  // Re-show the intake form after a clinician exits clinician mode (Header's
+  // banner dispatches this once it clears localStorage) so the user can
+  // re-select a role — mirrors App.tsx's v1 `clinician-mode-exited` handler.
+  useEffect(() => {
+    const handleClinicianModeExited = () => {
+      setIntakeData(null);
+      setShowIntakeModal(true);
+    };
+    window.addEventListener("clinician-mode-exited", handleClinicianModeExited);
+    return () => window.removeEventListener("clinician-mode-exited", handleClinicianModeExited);
+  }, []);
+
+  const handleIntakeComplete = (data: IntakeData) => {
+    setIntakeData(data);
+    setShowIntakeModal(false);
+    window.dispatchEvent(new CustomEvent("intake-role-updated"));
+  };
 
   const greeting = getGreetingForUser(intakeData);
   const prompts = toChatStarterPrompts(
@@ -138,13 +178,26 @@ export function AssistantPanel() {
 
   const stream = useMemo(
     () =>
-      debugAgentStream(unstable_createLangGraphStream({
-        client,
-        assistantId: AGENT_ASSISTANT_ID,
-        // Use the native message tuple stream so streamed chunks and the
-        // final reply share a stable ID with the attached suggestions UI.
-        streamMode: ["messages-tuple", "updates", "custom"],
-      })),
+      withUserContext(
+        debugAgentStream(unstable_createLangGraphStream({
+          client,
+          assistantId: AGENT_ASSISTANT_ID,
+          // Use the native message tuple stream so streamed chunks and the
+          // final reply share a stable ID with the attached suggestions UI.
+          streamMode: ["messages-tuple", "updates", "custom"],
+        })),
+        // Read from the ref (not the `intakeData` state var) so this getter
+        // always sees the latest value without needing `stream` itself to
+        // be recreated on every intake change — see withUserContext.ts.
+        () =>
+          intakeDataRef.current
+            ? {
+                role: intakeDataRef.current.role,
+                intent: intakeDataRef.current.intent,
+                response_style: intakeDataRef.current.response_style,
+              }
+            : null
+      ),
     [client]
   );
 
@@ -184,6 +237,9 @@ export function AssistantPanel() {
     <div className="relative flex flex-1 w-full h-full mx-auto max-w-7xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
         <ThreadNavigation />
+        {showIntakeModal && (
+          <IntakeFormModal onComplete={handleIntakeComplete} />
+        )}
         <TrialThreadSync
           client={client}
           onThreadSwitch={(key, remoteId, trialState, contextScope, error) => {
@@ -342,6 +398,16 @@ function AssistantPanelBody({
   const runtimeKey = useAuiState((s) => s.optional.threadListItem?.id);
   const loading = isHydrating || runtimeKey !== activeThreadKey;
   const scope = !loading && contextScope && contextScope.type !== "trial_search" ? contextScope : undefined;
+
+  // "Find matching trials" / "Screen a patient" CTA — moved here (from
+  // ChatSurface) so its mobile icon-only form can be grouped, via a
+  // shared flex row, with the Trial Panel trigger it used to collide with
+  // (see the floating-controls row rendered below).
+  const aui = useAui();
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [showClinicianModal, setShowClinicianModal] = useState(false);
+  const isClinician = intakeData?.role === "clinician";
+  const openCtaModal = () => (isClinician ? setShowClinicianModal(true) : setShowMatchModal(true));
   const openedSnapshotRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (scope && !isMobile && openedSnapshotRef.current !== activeThreadKey) {
@@ -461,6 +527,26 @@ function AssistantPanelBody({
             </div>
           )}
           {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} bothPanelsOpen={sidebarOpen && trialPanelOpen} />}
+          {/*
+           * Desktop "Find matching trials" / "Screen a patient" CTA — the
+           * full labeled pill, centered independently of the right-side
+           * floating-controls row below (so it keeps its own definition
+           * of "centered" regardless of how wide that row gets).
+           */}
+          {!loading && !hydrationError && !scope && (
+            <div className="hidden md:flex absolute top-4 left-1/2 -translate-x-1/2 z-20">
+              <button
+                onClick={openCtaModal}
+                className="flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
+                aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
+              >
+                <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
+                <span className="font-semibold text-sm text-blue-600">
+                  {isClinician ? "Screen a patient" : "Find matching trials"}
+                </span>
+              </button>
+            </div>
+          )}
           {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
             isScoped={!!scope}
             placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
@@ -468,8 +554,60 @@ function AssistantPanelBody({
             prompts={scope ? [] : prompts}
             intakeData={intakeData}
           />}
-          {!loading && !hydrationError && (scope ? (!trialPanelOpen && <button onClick={openPanel} aria-label="Open conversation trials" className="absolute top-4 right-4 z-20 flex items-center gap-2 h-12 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300"><PanelRight className="h-4 w-4" />Trials {scope.trialIds.length}</button>) : <TrialPanelTrigger />)}
+          {/*
+           * Right-side floating-controls row — shares one flex container
+           * (fixed-width children, `gap-2`) instead of each button being
+           * independently `absolute`-positioned, which is what let the
+           * mobile CTA icon and the Trial Panel trigger's widening
+           * "Trials N" label collide before. Mobile-only CTA icon comes
+           * first (further from the edge), trigger/scope button last.
+           */}
+          {!loading && !hydrationError && (
+            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+              {!scope && (
+                <button
+                  onClick={openCtaModal}
+                  className="md:hidden flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
+                  aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
+                  title={isClinician ? "Screen a patient" : "Find matching trials"}
+                >
+                  <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
+                </button>
+              )}
+              {scope ? (
+                !trialPanelOpen && (
+                  <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-12 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
+                    <PanelRight className="h-4 w-4" />
+                    Trials {scope.trialIds.length}
+                  </button>
+                )
+              ) : (
+                <TrialPanelTrigger />
+              )}
+            </div>
+          )}
         </div>
+
+        {!scope && showMatchModal && (
+          <MatchProfileModal
+            onConfirm={(_profile: MatchProfile, message: string) => {
+              setShowMatchModal(false);
+              aui.thread.append(message);
+            }}
+            onClose={() => setShowMatchModal(false)}
+          />
+        )}
+
+        {!scope && showClinicianModal && (
+          <ClinicianModal
+            initialStep="prescreen"
+            onConfirm={(message: string) => {
+              setShowClinicianModal(false);
+              aui.thread.append(message);
+            }}
+            onClose={() => setShowClinicianModal(false)}
+          />
+        )}
 
         {/*
          * Right-side Trial Panel — persistent structured view of the

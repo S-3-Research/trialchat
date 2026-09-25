@@ -18,8 +18,21 @@ function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
-/** Reads current test-mode flag from localStorage. */
+/**
+ * Reads current test-mode flag from localStorage.
+ *
+ * Always reports test mode as on outside of a *real* production deploy —
+ * local dev (`next dev` / Docker) and Vercel preview branches alike (both
+ * build with `NODE_ENV=production`, so that var alone can't tell a
+ * preview branch apart from the real thing; `NEXT_PUBLIC_VERCEL_ENV` can
+ * — see next.config.ts). Reuses this same is_test mechanism instead of a
+ * separate dev-mode/dev-database setup, so non-production runs never
+ * write "real" (non-test) analytics rows by accident. Only an actual
+ * production deploy falls through to the real localStorage-backed toggle
+ * below.
+ */
 export function isTestMode(): boolean {
+  if (process.env.NEXT_PUBLIC_VERCEL_ENV !== "production") return true;
   if (!isBrowser()) return false;
   return localStorage.getItem(TEST_MODE_KEY) === "1";
 }
