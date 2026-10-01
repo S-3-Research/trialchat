@@ -3,7 +3,7 @@ import type { AgentTool } from "./registry.js";
 
 /**
  * Clinical trial search tool. Ported from the legacy ChatKit tool handler
- * (apps/web/app/api/tools/route.ts::handleGetTrials) — calls the same
+ * (the former web tools API) — calls the same
  * external clinical-trials-matching API directly from the agent process.
  *
  * Requires CLINICAL_TRIALS_API_KEY in apps/agent's environment.

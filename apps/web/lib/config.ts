@@ -1,11 +1,5 @@
-import { ColorScheme, ThemeOption } from "@openai/chatkit";
 import { IntakeData } from "./types/intake";
 import { ExtendedStartScreenPrompt } from "./types/prompts";
-
-export const WORKFLOW_ID =
-  process.env.NEXT_PUBLIC_CHATKIT_WORKFLOW_ID?.trim() ?? "";
-
-export const CREATE_SESSION_ENDPOINT = "/api/create-session";
 
 // Default starter prompts (fallback for users without intake data)
 export const DEFAULT_STARTER_PROMPTS: ExtendedStartScreenPrompt[] = [
@@ -322,32 +316,3 @@ export const getGreetingForUser = (intakeData: IntakeData | null): string => {
 };
 
 export const PLACEHOLDER_INPUT = "Ask about clinical trials or Alzheimer's disease...";
-
-// Keep these for backward compatibility
-export const STARTER_PROMPTS = DEFAULT_STARTER_PROMPTS;
-export const GREETING = GREETINGS.default;
-
-export const getThemeConfig = (
-  theme: ColorScheme,
-  baseSize?: 14 | 15 | 16 | 17 | 18
-): ThemeOption => ({
-  color: {
-    grayscale: {
-      hue: 215,  // 蓝色调的灰度，更符合医疗科技感
-      tint: 5,
-      shade: theme === "dark" ? -1 : -3,
-    },
-    accent: {
-      primary: theme === "dark" ? "#60a5fa" : "#2563eb",  // 蓝色主题色，匹配 TrialChat
-      level: 2,  // 稍微增强对比度
-    },
-  },
-  radius: "round",  // 圆润的边角，友好亲和
-  density: "normal",  // 正常间距，适合老年人阅读
-  ...(baseSize && {
-    typography: {
-      baseSize,
-    },
-  }),
-  // chatkit.studio/playground to explore config options
-});

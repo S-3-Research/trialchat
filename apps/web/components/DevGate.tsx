@@ -3,12 +3,7 @@
 import { useEffect, useState } from "react";
 import { DEV_SESSION_KEY, DEV_PASSWORD_KEY } from "@/lib/devAuth";
 
-/**
- * Client-side password gate for internal dev-only tools (dev-test,
- * dev-test/history, voice-test). Mirrors the AdminLogin pattern used for
- * the /admin dashboard, but posts to /api/dev-auth and stores its own
- * sessionStorage keys so it doesn't collide with the admin session.
- */
+/** Password gate for the internal voice comparison tool. */
 export default function DevGate({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");

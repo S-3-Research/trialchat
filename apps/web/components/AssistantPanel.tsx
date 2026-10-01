@@ -58,9 +58,8 @@ import {
 } from "@/lib/voiceDictationAdapters";
 
 /**
- * Phase B/D: LangGraph-backed chat panel with starter prompts / greeting
- * parity with the ChatKit experience, plus a New Chat / history sidebar
- * (Phase D) backed by LangGraph Server's own thread storage — see
+ * LangGraph-backed chat panel with personalized starter prompts and a
+ * conversation sidebar backed by LangGraph Server thread storage — see
  * lib/threadListAdapter.ts.
  *
  * Talks to apps/agent through the same-origin /api/agent proxy (see
@@ -123,15 +122,14 @@ export function AssistantPanel() {
   }, [client, activeRemoteId, activeThread.contextScope, activeThread.error]);
 
   // Whether the intake form (goal/role/tone) still needs to be shown —
-  // mirrors App.tsx's v1 behavior so v2 gets the same first-visit intake
-  // flow. `null` means "not checked yet" (avoids a flash of the modal
+  // shown on the first visit unless the matching entry point skips it. `null` means "not checked yet" (avoids a flash of the modal
   // before the initial localStorage read resolves).
   const [showIntakeModal, setShowIntakeModal] = useState<boolean | null>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(INTAKE_STORAGE_KEY);
     if (!stored) {
-      setShowIntakeModal(true);
+      setShowIntakeModal(new URLSearchParams(window.location.search).get("skip_intake") !== "1");
       return;
     }
     try {
@@ -145,7 +143,7 @@ export function AssistantPanel() {
 
   // Re-show the intake form after a clinician exits clinician mode (Header's
   // banner dispatches this once it clears localStorage) so the user can
-  // re-select a role — mirrors App.tsx's v1 `clinician-mode-exited` handler.
+  // re-select a role.
   useEffect(() => {
     const handleClinicianModeExited = () => {
       setIntakeData(null);
@@ -236,7 +234,7 @@ export function AssistantPanel() {
   return (
     <div className="relative flex flex-1 w-full h-full mx-auto max-w-7xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
-        <ThreadNavigation />
+        <ThreadNavigation enabled={showIntakeModal !== null} />
         {showIntakeModal && (
           <IntakeFormModal onComplete={handleIntakeComplete} />
         )}
@@ -415,6 +413,23 @@ function AssistantPanelBody({
       openPanel();
     }
   }, [scope, isMobile, activeThreadKey, openPanel]);
+  // Preserve the homepage's direct matching entry point without reopening it
+  // when the thread URL changes. Scope hydration must finish first.
+  const entryHandled = useRef(false);
+  useEffect(() => {
+    if (loading || entryHandled.current) return;
+    entryHandled.current = true;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("open_match") === "1" && !scope) {
+      openPanel();
+      if (isClinician) setShowClinicianModal(true);
+      else setShowMatchModal(true);
+    }
+    url.searchParams.delete("open_match");
+    url.searchParams.delete("skip_intake");
+    window.history.replaceState(window.history.state, "", url);
+  }, [loading, scope, isClinician, openPanel]);
+
   const panel = loading ? <p role="status" className="p-6 text-sm text-slate-500">Loading conversation trials…</p>
     : hydrationError ? <p role="alert" className="p-6 text-sm text-red-600">{hydrationError}</p>
     : scope ? (trialPanelOpen ? <BookmarkSnapshotPanel key={activeThreadKey} scope={scope} onClose={closeTrialPanel} /> : null)

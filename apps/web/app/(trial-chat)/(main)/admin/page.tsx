@@ -338,7 +338,7 @@ export default function AdminPage() {
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
             <Link
-              href="/trial-chat"
+              href="/"
               className="mb-3 inline-flex items-center text-xs text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors"
             >
               <svg className="mr-1.5 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -52,7 +52,7 @@ describe("collection change notice", () => {
     const start = root.root.findAllByType("button").find((b) => b.children.join("").includes("Start a new chat"))!;
     await act(async () => { await start.props.onClick(); });
     expect(createThread).toHaveBeenCalledWith("bookmark_full_snapshot", ["NCT00000001"], "Discuss 1 bookmarked trial", [live.bookmarks[0].trial]);
-    expect(assign).toHaveBeenCalledWith("/trial-chat/chat-v2?thread=new-thread");
+    expect(assign).toHaveBeenCalledWith("/chat?thread=new-thread");
     expect(scope.trialIds).toHaveLength(2);
   });
   it("does not mislabel a deliberate selection as a changed collection", async () => {

@@ -1,8 +1,8 @@
 /**
  * guestId.ts — shared helpers for guest user ID + test-mode flag.
  *
- * Test mode is triggered by visiting any trial-chat URL with `?test=true`
- * (e.g. https://igc-trialchat.vercel.app/trial-chat?test=true). Once set,
+ * Test mode is triggered by visiting any app URL with `?test=true`
+ * (e.g. https://igc-trialchat.vercel.app/?test=true). Once set,
  * it is persisted in localStorage so it survives navigation/reloads until
  * the user explicitly exits test mode (banner "Exit" button, or `?test=false`).
  *

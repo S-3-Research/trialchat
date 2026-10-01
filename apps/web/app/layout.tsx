@@ -33,10 +33,6 @@ export default function RootLayout({
       >
         <head>
           <ThemeScript />
-          <Script
-            src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"
-            strategy="beforeInteractive"
-          />
           <Script 
             src="https://unpkg.com/@phosphor-icons/web" 
             strategy="lazyOnload" 

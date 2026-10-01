@@ -1,147 +1,69 @@
-# ChatKit Starter Template
+# Acadia TrialChat
 
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![NextJS](https://img.shields.io/badge/Built_with-NextJS-blue)
-![OpenAI API](https://img.shields.io/badge/Powered_by-OpenAI_API-orange)
+A clinical-trial assistant built with Next.js, assistant-ui and a LangGraph.js agent.
 
-This repository is the simplest way to bootstrap a [ChatKit](http://openai.github.io/chatkit-js/) application. It ships with a minimal Next.js UI, the ChatKit web component, and a ready-to-use session endpoint so you can experiment with OpenAI-hosted workflows built using [Agent Builder](https://platform.openai.com/agent-builder).
+## Applications
 
-## Repository layout (monorepo)
+- `apps/web`: landing page, chat, Trial Panel, bookmarks, preferences and web API routes.
+- `apps/agent`: intent routing, model calls, trial search, knowledge tools and follow-up suggestions.
+- `packages/shared-types`: shared schemas and types.
 
-This is an npm workspaces monorepo with two independently deployable apps:
-
-```text
-apps/
-├── web/    # Next.js + ChatKit frontend (production: Vercel)
-└── agent/  # Standalone LangGraph.js Agent Server (production: Docker)
-packages/
-└── shared-types/  # Types/schemas shared between web and agent
-docker-compose.yml # Local-dev-only orchestration for web + agent
-```
-
-`apps/web` and `apps/agent` are separate npm workspaces with independent
-`package.json`, dependencies, and Dockerfiles. Docker Compose is only a local
-development convenience — production deploys each app independently (web to
-Vercel, agent as its own container image).
-
-## What You Get
-
-- Next.js app with `<openai-chatkit>` web component and theming controls, in [apps/web](apps/web)
-- API endpoint for creating a session at [apps/web/app/api/create-session/route.ts](apps/web/app/api/create-session/route.ts)
-- Config file for starter prompts, theme, placeholder text, and greeting message
-- A standalone LangGraph.js Agent Server skeleton in [apps/agent](apps/agent), ready for `langgraph dev` / LangGraph Studio
-
-## Getting Started
-
-### Option A — Docker Compose (recommended, lowest setup effort)
+## Local development
 
 ```bash
-git clone ...
-cp .env.example .env
+npm install
 cp apps/web/.env.example apps/web/.env.local
 cp apps/agent/.env.example apps/agent/.env.local
-docker compose up
 ```
 
-- Web: http://localhost:3000
-- Agent API: http://localhost:2024
+Fill in the per-app environment files, then run `npm run dev` or `docker compose up`.
+The web app runs on http://localhost:3000 and the agent on http://localhost:2024.
+The root `.env.example` is a guide, not a runtime configuration file.
 
-### Option B — Run web and agent independently on the host
+Docker Compose injects the service URLs automatically. Its agent runs the development
+server; this is not a production Agent Server deployment. See the per-app examples
+for database configuration and the distinction between application checkpointers
+and server-managed persistence.
 
-```bash
-npm install
+## Deployment
 
-# terminal 1
-npm run dev:web       # or: cd apps/web && npm run dev
+Deploy web and agent independently. For a hosted web app talking to LangGraph Cloud:
 
-# terminal 2
-npm run dev:agent     # or: cd apps/agent && npx langgraphjs dev
+- Set `LANGGRAPH_API_URL` and `LANGGRAPH_API_KEY` on **web**.
+- Configure model/tool credentials on **agent**. Omit its application `DATABASE_URL`
+  for managed Cloud persistence.
+- Web Supabase credentials configure separate business data, not graph checkpoints.
+- `NEXT_PUBLIC_*` settings are browser-visible build-time values.
 
-# both at once
-npm run dev
-```
+## Routes
 
-When running natively, [apps/web](apps/web) reaches the agent via
-`LANGGRAPH_API_URL=http://localhost:2024`. Inside Docker Compose the web
-container instead uses `LANGGRAPH_API_URL=http://agent:2024` — see the root
-[.env.example](.env.example) for details.
+- `/`: landing page
+- `/chat`: the sole chat runtime (LangGraph + assistant-ui)
+- `/bookmarks`, `/settings`, `/personalization`, `/docs`, `/updates`
+- `/admin`: link-event administration
+- `/voice-test`: password-gated voice comparison tool
 
-**Thread persistence:** the agent checkpoints conversation state to Postgres
-via `DATABASE_URL` (see [apps/agent/.env.example](apps/agent/.env.example)).
-Docker Compose provisions this automatically (the `postgres` service). When
-running the agent natively (Option B), start a local Postgres yourself, e.g.:
+The old `/trial-chat` public URLs and chat-v2 URLs redirect to the new routes,
+retaining query parameters. The legacy chat runtime, session test runner, test
+history and their APIs have been removed. Existing database records are not deleted.
+The `?test=true` analytics flag and voice-test authentication remain supported.
+Browser storage keys for guest identity and appearance retain their previous names
+so existing conversations and preferences remain accessible.
 
-```bash
-docker run -d --name acadia-agent-postgres --restart unless-stopped \
-  -e POSTGRES_USER=acadia -e POSTGRES_PASSWORD=acadia -e POSTGRES_DB=acadia_agent \
-  -p 5433:5432 -v acadia_agent_pgdata:/var/lib/postgresql/data postgres:16-alpine
-
-echo "DATABASE_URL=postgres://acadia:acadia@localhost:5433/acadia_agent" >> apps/agent/.env.local
-```
-
-If `DATABASE_URL` is omitted, the agent falls back to an in-memory
-checkpointer (conversations are lost on every restart) — fine for quick
-one-off testing, not for anything you want to keep.
-
-### 1. Install dependencies
+## Validation
 
 ```bash
-npm install
-```
-
-### 2. Create your environment file
-
-Copy the example file and fill in the required values:
-
-```bash
-cp apps/web/.env.example apps/web/.env.local
-```
-
-You can get your workflow id from the [Agent Builder](https://platform.openai.com/agent-builder) interface, after clicking "Publish":
-
-<img src="./apps/web/public/docs/workflow.jpg" width=500 />
-
-You can get your OpenAI API key from the [OpenAI API Keys](https://platform.openai.com/api-keys) page.
-
-### 3. Configure ChatKit credentials
-
-Update `.env.local` with the variables that match your setup.
-
-- `OPENAI_API_KEY` — This must be an API key created **within the same org & project as your Agent Builder**. If you already have a different `OPENAI_API_KEY` env variable set in your terminal session, that one will take precedence over the key in `.env.local` one (this is how a Next.js app works). So, **please run `unset OPENAI_API_KEY` (`set OPENAI_API_KEY=` for Windows OS) beforehand**.
-- `NEXT_PUBLIC_CHATKIT_WORKFLOW_ID` — This is the ID of the workflow you created in [Agent Builder](https://platform.openai.com/agent-builder), which starts with `wf_...`
-- (optional) `CHATKIT_API_BASE` - This is a customizable base URL for the ChatKit API endpoint
-
-> Note: if your workflow is using a model requiring organization verification, such as GPT-5, make sure you verify your organization first. Visit your [organization settings](https://platform.openai.com/settings/organization/general) and click on "Verify Organization".
-
-### 4. Run the app
-
-```bash
-npm run dev:web
-```
-
-Visit `http://localhost:3000` and start chatting. Use the prompts on the start screen to verify your workflow connection, then customize the UI or prompt list in [apps/web/lib/config.ts](apps/web/lib/config.ts) and [apps/web/components/ChatKitPanel.tsx](apps/web/components/ChatKitPanel.tsx).
-
-### 5. Deploy your app
-
-```bash
+npm test --workspace=apps/web
 npm run build:web
+npm run build:agent
 ```
 
-`apps/web` deploys independently (e.g. to Vercel) from `apps/agent`, which
-ships as its own Docker image — see [apps/agent/Dockerfile](apps/agent/Dockerfile).
-Setting the deployed agent's URL as `LANGGRAPH_API_URL` for the deployed web
-app connects the two in production.
-
-Before deploying your app, you need to verify the domain by adding it to the [Domain allowlist](https://platform.openai.com/settings/organization/security/domain-allowlist) on your dashboard.
-
-## Customization Tips
-
-- Adjust starter prompts, greeting text, [chatkit theme](https://chatkit.studio/playground), and placeholder copy in [apps/web/lib/config.ts](apps/web/lib/config.ts).
-- Update the event handlers inside [apps/web/components/ChatKitPanel.tsx](apps/web/components/ChatKitPanel.tsx) to integrate with your product analytics or storage.
+Starter prompts and greeting text live in `apps/web/lib/config.ts`;
+the chat runtime is configured in `apps/web/components/AssistantPanel.tsx`.
 
 ## Adding a new agent tool (LangGraph + assistant-ui)
 
-The LangGraph-based chat UI (`apps/trial-chat/chat-v2`, built on
+The LangGraph-based chat UI (`/chat`, built on
 `@assistant-ui/react` + `@assistant-ui/react-langgraph`) supports model tool
 calls end-to-end, with a custom React component per tool for rendering
 searching/result/error states inline in the thread. This section uses the
@@ -283,7 +205,7 @@ that doesn't return a plain string.
   ```
   Look for a `"type": "tool"` message in the response — its `content` is the
   JSON string your `by_name` component will need to parse.
-- Then exercise it through the real UI at `/trial-chat/chat-v2` to confirm
+- Then exercise it through the real UI at `/chat` to confirm
   the searching/result/error states all render as expected.
 - After changing `apps/agent/src/**` or `apps/web/components/**` source
   files only (no new npm dependency), Docker Compose hot-reloads both dev
@@ -291,8 +213,3 @@ that doesn't return a plain string.
   (`docker compose up -d --build <service>`) is only required after editing
   a `package.json` / installing a new package, since `node_modules` lives in
   a named volume that isn't refreshed by the source bind mount.
-
-## References
-
-- [ChatKit JavaScript Library](http://openai.github.io/chatkit-js/)
-- [Advanced Self-Hosting Examples](https://github.com/openai/openai-chatkit-advanced-samples)

@@ -3,7 +3,7 @@ export const DEMOS = {
     id: 'trial-chat',
     name: 'Trial Chat',
     description: 'AI-powered chat interface for clinical trials',
-    path: '/trial-chat',
+    path: '/',
     hidden: false,
   },
 } as const;

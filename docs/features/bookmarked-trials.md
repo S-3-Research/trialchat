@@ -1,7 +1,7 @@
 # Bookmarked Trials
 
-Entry point: `/trial-chat/bookmarks` (header navigation). Search results in
-`/trial-chat/chat-v2` and the full-page collection reuse `TrialCard`.
+Entry point: `/bookmarks` (header navigation). Search results in
+`/chat` and the full-page collection reuse `TrialCard`.
 
 ## Ownership and persistence
 
@@ -47,7 +47,7 @@ threads. Scoped conversations always route to the trial specialist, which only
 binds `trial_details` and validates every requested ID against the saved scope.
 Discovery and web-search tools are unavailable, including to hallucinated calls.
 Follow-up suggestions are instructed to stay within the set. Requests for more
-trials link to `/trial-chat/chat-v2?new=1`, a fresh normal search conversation.
+trials link to `/chat?new=1`, a fresh normal search conversation.
 
 For all-bookmark snapshots, changed live membership shows an informational notice
 and an action to create a new conversation with current bookmarks. Subset/single

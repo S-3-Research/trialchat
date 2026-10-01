@@ -29,7 +29,7 @@
 | `apps/web/components/assistant-ui/TrialSearchModal.tsx` | 年龄模式、条件和排序的统一提交 |
 | `apps/web/hooks/useLayoutTier.ts` | 三档响应式布局 |
 | `apps/web/app/globals.css` | 双滑块年龄范围样式 |
-| `apps/web/app/trial-chat/(main)/chat-v2/page.tsx` | 页面顶部间距调整 |
+| `apps/web/app/(trial-chat)/(main)/chat/page.tsx` | 页面顶部间距调整 |
 | `apps/agent/src/configs/{api-agent,knowledge,other-questions}.config.ts` | trial 上下文开关和已选 trial 提示词 |
 | `apps/agent/src/factories/create-agent-node.ts` | 构建模型专用上下文，不修改 checkpoint 中的完整结果 |
 | `apps/agent/src/types/active-trial-search.ts` | 与 Web payload 对齐的字段声明 |
@@ -124,7 +124,7 @@ Agent 在本地组装 system context：有 `selectedTrials` 时省略模型输�
 - 移动端 Trial Panel 宽度为 `min(92%, 30rem)`，不再使用桌面的 38% 分栏宽度。
 - Panel 显示 hydration skeleton，统一横向 padding，卡片小字号改用 rem，问答菜单增加图标；州缩写保持大写，完整名称使用标题格式。
 - Load more 位于列表底部，加载时在同位置显示 spinner，完成后显示下一页入口或已展示数量。
-- chat-v2 页面顶部 padding 略缩小。
+- chat 页面顶部 padding 略缩小。
 
 ## 8. 已知边界与后续验证
 

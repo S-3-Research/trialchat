@@ -1,3 +1,5 @@
+> Historical reference for the retired ChatKit implementation. Current intake and preferences use AssistantPanel, browser storage, and the LangGraph userContext input; see README.md.
+
 # Intake Form 逻辑文档
 
 ## 概述

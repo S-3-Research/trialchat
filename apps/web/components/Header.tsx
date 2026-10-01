@@ -31,7 +31,7 @@ export default function Header() {
     <header className="flex-none px-0 py-4 flex items-center justify-between mx-auto max-w-7xl w-[95%] z-50 transition-all duration-300 ease-in-out">
       {/* Left: Logo Area */}
       <div className="flex items-center gap-3">
-        <Link href="/trial-chat" className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10 flex items-center justify-center bg-gradient-to-br from-slate-200 to-white dark:from-slate-700 dark:to-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-white/10 group-hover:scale-105 transition-transform duration-300">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-slate-700 dark:text-slate-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
@@ -49,7 +49,7 @@ export default function Header() {
         
         {/* Navigation Links */}
         <nav className="hidden md:flex items-center gap-1">
-            <Link href="/trial-chat" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
+            <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
                 {/* Outlined Home Icon */}
                 <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -57,7 +57,7 @@ export default function Header() {
                 Home
             </Link>
 
-            <Link href="/trial-chat/docs" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
+            <Link href="/docs" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
                 {/* Outlined Document Icon */}
                 <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -65,7 +65,7 @@ export default function Header() {
                 Docs
             </Link>
 
-            <Link href="/trial-chat/bookmarks" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
+            <Link href="/bookmarks" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
                 <Bookmark className="w-5 h-5" strokeWidth={1.5} />
                 Bookmarks
             </Link>
@@ -166,7 +166,7 @@ export default function Header() {
                       <div className="px-3 py-2.5 flex flex-col gap-2">
                           <DropdownMenu.Item asChild>
                             <Link
-                              href="/trial-chat/settings"
+                              href="/settings"
                               className="flex items-center gap-2 w-full px-2 py-2 text-xs font-medium text-slate-700 rounded-lg border border-slate-200 bg-slate-50/50 transition-colors hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:border-slate-600 cursor-pointer outline-none group"
                             >
                               <div className="p-1 rounded-md bg-white dark:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500 transition-colors">
@@ -183,7 +183,7 @@ export default function Header() {
 
                           <DropdownMenu.Item asChild>
                             <Link
-                              href="/trial-chat/personalization"
+                              href="/personalization"
                               className="flex items-center gap-2 w-full px-2 py-2 text-xs font-medium text-slate-700 rounded-lg border border-slate-200 bg-slate-50/50 transition-colors hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:border-slate-600 cursor-pointer outline-none group"
                             >
                               <div className="p-1 rounded-md bg-white dark:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500 transition-colors">
@@ -223,25 +223,25 @@ export default function Header() {
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <Link href="/trial-chat/docs" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <Link href="/docs" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                       <FileText className="w-4 h-4" strokeWidth={1.5} />
                       Docs
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <Link href="/trial-chat/bookmarks" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <Link href="/bookmarks" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                       <Bookmark className="w-4 h-4" strokeWidth={1.5} />
                       Bookmarks
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <Link href="/trial-chat/personalization" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <Link href="/personalization" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                       <UserCog className="w-4 h-4" strokeWidth={1.5} />
                       Personalization
                     </Link>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item asChild>
-                    <Link href="/trial-chat/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                    <Link href="/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
                       <Settings className="w-4 h-4" strokeWidth={1.5} />
                       Settings
                     </Link>

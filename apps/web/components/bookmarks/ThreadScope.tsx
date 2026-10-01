@@ -10,14 +10,14 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 
 
 /** Open an already-created normal thread; never create a singleton bookmark chat. */
-export function ThreadNavigation() {
+export function ThreadNavigation({ enabled = true }: { enabled?: boolean }) {
   const aui = useAui();
   const remoteId = useAuiState((state) => state.optional.threadListItem?.remoteId);
   const started = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string>();
   useEffect(() => {
-    if (started.current) return;
+    if (!enabled || started.current) return;
     started.current = true;
     const params = new URL(window.location.href).searchParams;
     const id = params.get("thread");
@@ -33,10 +33,17 @@ export function ThreadNavigation() {
             aui.composer.setText(thread.metadata.initialPrompt);
           }
         }
+        // The clinician homepage flow hands a pre-screen request to the chat.
+        // Consume it once, after selecting the requested/new conversation.
+        const prescreen = sessionStorage.getItem("clinician_prescreen_prompt");
+        if (prescreen && !id) {
+          sessionStorage.removeItem("clinician_prescreen_prompt");
+          aui.thread.append(prescreen);
+        }
         setReady(true);
       } catch { setError("Could not open this conversation. Reload to retry."); }
     })();
-  }, [aui]);
+  }, [aui, enabled]);
   useEffect(() => {
     if (!ready) return;
     // Keep the selected thread addressable: a reload must restore its fixed set.
@@ -64,7 +71,7 @@ export function ThreadScopeHeader({ scope, onViewTrials, bothPanelsOpen }: { sco
       const trials = bookmarks.map((b) => b.trial).filter((t) => !!t);
       const id = await createScopedThread("bookmark_full_snapshot", currentIds, `Discuss ${currentIds.length} bookmarked ${currentIds.length === 1 ? "trial" : "trials"}`, trials);
       // Navigate to a fresh runtime, preserving the old thread and its messages.
-      window.location.assign(`/trial-chat/chat-v2?thread=${encodeURIComponent(id)}`);
+      window.location.assign(`/chat?thread=${encodeURIComponent(id)}`);
     } catch { setBusy(false); setError("Could not create the conversation. Please try again."); }
   };
   return <div className={`${bothPanelsOpen ? "mt-5" : "mt-20"} mx-5 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-slate-700 dark:text-slate-200`}>
@@ -72,11 +79,11 @@ export function ThreadScopeHeader({ scope, onViewTrials, bothPanelsOpen }: { sco
     {changed && <div className="mt-2 space-y-1">
       <p>Your bookmarks have changed since this conversation started.</p>
       <p>This conversation is still using the original {scope.trialIds.length} {scope.trialIds.length === 1 ? "trial" : "trials"}.</p>
-      {currentIds.length ? <button onClick={startNew} disabled={busy} className="text-blue-600 dark:text-blue-400 disabled:opacity-40">{busy ? "Creating conversation…" : "Start a new chat with current bookmarks"}</button> : <p>There are no current bookmarks. <Link href="/trial-chat/bookmarks" className="text-blue-600 dark:text-blue-400">Go to Bookmarks →</Link></p>}
+      {currentIds.length ? <button onClick={startNew} disabled={busy} className="text-blue-600 dark:text-blue-400 disabled:opacity-40">{busy ? "Creating conversation…" : "Start a new chat with current bookmarks"}</button> : <p>There are no current bookmarks. <Link href="/bookmarks" className="text-blue-600 dark:text-blue-400">Go to Bookmarks →</Link></p>}
     </div>}
     <div className="mt-2 flex flex-wrap gap-4 text-xs text-blue-600 dark:text-blue-400">
-      <Link href="/trial-chat/bookmarks">Manage bookmarks →</Link>
-      <a href="/trial-chat/chat-v2?new=1">Search for more trials →</a>
+      <Link href="/bookmarks">Manage bookmarks →</Link>
+      <a href="/chat?new=1">Search for more trials →</a>
     </div>
     {error && <p role="alert" className="mt-2 text-red-600">{error}</p>}
   </div>;

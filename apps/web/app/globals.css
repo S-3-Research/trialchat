@@ -176,13 +176,6 @@ body {
   40% { background-color: rgb(148 163 184); }
 }
 
-/* ChatKitPanel fixed width breakpoints - Force desktop layout minimum width to prevent internal jump */
-@media (min-width: 768px) and (max-width: 820px) {
-  .main-layout-container {
-    min-width: 779px !important;
-    width: auto !important; /* Let min-width take precedence over the percentage if needed */
-  }
-}
 
 @layer utilities {
     .bg-noise {

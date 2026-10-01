@@ -50,7 +50,7 @@ export function ClinicianModal({ onClose, initialStep = "intent", onConfirm }: C
 
   const handleLearnAboutTrials = () => {
     saveIntake("learn_about_trials");
-    router.push("/trial-chat/chat");
+    router.push("/chat");
   };
 
   const validatePrescreen = (): boolean => {
@@ -92,7 +92,7 @@ export function ClinicianModal({ onClose, initialStep = "intent", onConfirm }: C
       if (typeof window !== "undefined") {
         sessionStorage.setItem(CLINICIAN_PRESCREEN_KEY, message);
       }
-      router.push("/trial-chat/chat");
+      router.push("/chat");
     }
   };
 

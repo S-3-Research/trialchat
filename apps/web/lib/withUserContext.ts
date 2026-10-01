@@ -38,6 +38,6 @@ export function withUserContext(
       userContext && Object.keys(userContext).length > 0
         ? { ...config, state: { ...config.state, userContext } }
         : config;
-    yield* stream(messages, nextConfig);
+    yield* await stream(messages, nextConfig);
   };
 }

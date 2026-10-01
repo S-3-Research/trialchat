@@ -11,6 +11,23 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV ?? "",
   },
+  async redirects() {
+    return [
+      { source: "/trial-chat", destination: "/", permanent: true },
+      { source: "/trial-chat/chat-v2", destination: "/chat", permanent: true },
+      { source: "/chat-v2", destination: "/chat", permanent: true },
+      ...["chat", "settings", "bookmarks", "personalization", "docs", "updates", "admin", "voice-test"].map((page) => ({
+        source: `/trial-chat/${page}`,
+        destination: `/${page}`,
+        permanent: true,
+      })),
+      ...["sign-in", "sign-up"].map((page) => ({
+        source: `/trial-chat/${page}/:rest*`,
+        destination: `/${page}/:rest*`,
+        permanent: true,
+      })),
+    ];
+  },
   webpack: (config) => {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),

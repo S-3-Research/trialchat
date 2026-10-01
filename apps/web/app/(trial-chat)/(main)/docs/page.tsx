@@ -9,7 +9,7 @@ export default function DocsPage() {
         {/* Header */}
         <div className="mb-10">
           <Link
-            href="/trial-chat"
+            href="/"
             className="mb-4 inline-flex items-center text-sm text-slate-600 transition hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
           >
             <svg

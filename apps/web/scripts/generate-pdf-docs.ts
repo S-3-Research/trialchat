@@ -5,7 +5,7 @@
  *   (public/docs/covers/<slug>.png)
  * - Extracts a title (from PDF metadata, falling back to filename) and a
  *   short description (from the first meaningful line of extracted text)
- * - Writes the result to data/docs.json, consumed by the /trial-chat/docs page
+ * - Writes the result to data/docs.json, consumed by the /docs page
  *
  * Run with: npx tsx scripts/generate-pdf-docs.ts
  */

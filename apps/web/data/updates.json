@@ -1,10 +1,24 @@
 {
   "latestUpdates": [
     {
+      "version": "v2.0.0",
+      "date": "September 24, 2026",
+      "title": "New Chat Experience, Bookmarks & Simpler Navigation",
+      "isLatest": true,
+      "items": [
+        "The new chat experience is now the default at /chat, with conversation history, streamed answers, and follow-up suggestions.",
+        "Search and filter clinical trials in the Trial Panel, and pin trials to ask focused questions.",
+        "Bookmark trials and start conversations with a fixed set of saved trials.",
+        "Updated preferences, clinician screening, and homepage links to open the new chat.",
+        "Simplified page addresses: /settings, /bookmarks, /docs, and /updates. Existing public links redirect to the new pages.",
+        "Retired the previous chat implementation and the internal session test runner and history pages."
+      ]
+    },
+    {
       "version": "v1.0.0",
       "date": "March 31, 2026",
       "title": "Landing Page Visual Overhaul & Match Flow Polish",
-      "isLatest": true,
+      "isLatest": false,
       "items": [
         "Added cinematic entrance animations with staggered fade-in-up effects on landing page",
         "New ambient light beam background element for depth and atmosphere",
@@ -50,7 +64,7 @@
         "Improved API error handling against undefined or malformed upstream payloads",
         "Updated copyright year to 2026",
         "Added automated chat session test runner with dataset support",
-        "Test history page at /dev-test/history for reviewing past test runs"
+        "Test history for reviewing past test runs (retired in v2.0.0)"
       ]
     },
     {
@@ -141,10 +155,6 @@
     }
   ],
   "plannedFeatures": [
-    {
-      "title": "Multi-language Voice Input Support",
-      "description": "Add support for Spanish, Chinese, and other languages for voice input"
-    },
     {
       "title": "Voice Output (Text-to-Speech)",
       "description": "Read AI responses aloud for users with visual impairments"

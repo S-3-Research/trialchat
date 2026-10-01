@@ -20,10 +20,10 @@ export default function Home() {
   // Read the raw query string directly from window.location instead of
   // useSearchParams() so this doesn't force a Suspense boundary around the
   // whole landing page during static generation.
-  const [chatHref, setChatHref] = useState("/trial-chat/chat");
+  const [chatHref, setChatHref] = useState("/chat");
   useEffect(() => {
     const qs = window.location.search;
-    if (qs) setChatHref(`/trial-chat/chat${qs}`);
+    if (qs) setChatHref(`/chat${qs}`);
   }, []);
 
 
@@ -252,7 +252,7 @@ export default function Home() {
                         </span>
                     </button>
 
-                    <Link href="/trial-chat/updates" className={`px-4 py-2 rounded-full border transition-all duration-200 flex items-center gap-2 hover:scale-105 active:scale-95 ${
+                    <Link href="/updates" className={`px-4 py-2 rounded-full border transition-all duration-200 flex items-center gap-2 hover:scale-105 active:scale-95 ${
                         isLight ? 'border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:shadow-md hover:shadow-slate-200' : 'border-white/20 bg-white/5 hover:bg-white/10 hover:shadow-md hover:shadow-black/20'
                     }`}>
                         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -281,7 +281,7 @@ export default function Home() {
                     <div className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-xl md:hidden flex flex-col items-center justify-center space-y-8 animate-custom-fade-in-up">
                         <span className="text-2xl font-light text-slate-300 hover:text-white cursor-pointer">Why TrialChat</span>
                         <span className="text-2xl font-light text-slate-300 hover:text-white cursor-pointer">How it Works</span>
-                        <Link href="/trial-chat/updates" className="text-2xl font-bold text-white flex items-center gap-3">
+                        <Link href="/updates" className="text-2xl font-bold text-white flex items-center gap-3">
                             Updates
                         </Link>
                     </div>
@@ -359,7 +359,7 @@ export default function Home() {
                             {/* Button 2: Match me to Trials — blue shimmer */}
                             <div className="shimmer-border-btn transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-500/25">
                                 <Link
-                                    href="/trial-chat/chat?skip_intake=1&open_match=1"
+                                    href="/chat?skip_intake=1&open_match=1"
                                     className={`flex items-center justify-between w-full py-4 px-6 rounded-[10px] transition-colors focus:outline-none ${isLight ? 'bg-white hover:bg-slate-50' : 'bg-[#0f1623] hover:bg-slate-800'}`}
                                 >
                                     <span className="flex items-center gap-2 font-semibold">
@@ -476,7 +476,7 @@ export default function Home() {
                 isLight ? 'text-slate-500 bg-white/80 border-slate-200' : 'text-slate-600 bg-slate-950/80 border-white/5'
             }`}>
                 <p>TRIALCHAT is provided by <a href={buildTrackedUrl("https://s-3.io", { cta: "footer-s3-link" })} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:opacity-80 transition-opacity">S-3 Research LLC</a></p>
-                <Link href="/trial-chat/updates" className="mt-2 inline-block text-slate-400 underline">View Updates</Link>
+                <Link href="/updates" className="mt-2 inline-block text-slate-400 underline">View Updates</Link>
             </div>
 
             {/* Decorative Elements */}
