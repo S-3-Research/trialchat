@@ -50,6 +50,7 @@ import {
 import { toChatStarterPrompts } from "@/lib/types/prompts";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useLayoutTier } from "@/hooks/useLayoutTier";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { INTAKE_STORAGE_KEY, type IntakeData } from "@/lib/types/intake";
 import { useVoiceInputMode } from "@/contexts/VoiceInputModeContext";
 import {
@@ -466,13 +467,15 @@ function AssistantPanelBody({
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                 Chats
               </span>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                aria-label="Collapse chat history"
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                <History className="w-4 h-4" strokeWidth={2} />
-              </button>
+              <Tooltip label="Collapse chat history">
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  aria-label="Collapse chat history"
+                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <History className="w-4 h-4" strokeWidth={2} />
+                </button>
+              </Tooltip>
             </div>
             <div className="flex-1 min-h-0">
               <ThreadListSidebar />
@@ -488,13 +491,15 @@ function AssistantPanelBody({
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   Chats
                 </span>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  aria-label="Close chat history"
-                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <X className="w-4 h-4" strokeWidth={2} />
-                </button>
+                <Tooltip label="Close chat history">
+                  <button
+                    onClick={() => setSidebarOpen(false)}
+                    aria-label="Close chat history"
+                    className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <X className="w-4 h-4" strokeWidth={2} />
+                  </button>
+                </Tooltip>
               </div>
               <div
                 className="flex-1 min-h-0"
@@ -524,21 +529,25 @@ function AssistantPanelBody({
            */}
           {!sidebarOpen && (
             <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-              <button
-                onClick={() => setSidebarOpen(true)}
-                aria-label="Open chat history"
-                className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              >
-                <History className="w-4 h-4" strokeWidth={2} />
-              </button>
-              <ThreadListPrimitive.New asChild>
+              <Tooltip label="Chat history">
                 <button
-                  aria-label="New chat"
+                  onClick={() => setSidebarOpen(true)}
+                  aria-label="Open chat history"
                   className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
-                  <Plus className="w-4 h-4" strokeWidth={2} />
+                  <History className="w-4 h-4" strokeWidth={2} />
                 </button>
-              </ThreadListPrimitive.New>
+              </Tooltip>
+              <Tooltip label="New chat">
+                <ThreadListPrimitive.New asChild>
+                  <button
+                    aria-label="New chat"
+                    className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" strokeWidth={2} />
+                  </button>
+                </ThreadListPrimitive.New>
+              </Tooltip>
             </div>
           )}
           {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} bothPanelsOpen={sidebarOpen && trialPanelOpen} />}
@@ -550,16 +559,18 @@ function AssistantPanelBody({
            */}
           {!loading && !hydrationError && !scope && (
             <div className="hidden md:flex absolute top-4 left-1/2 -translate-x-1/2 z-20">
-              <button
-                onClick={openCtaModal}
-                className="flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
-                aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
-              >
-                <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
-                <span className="font-semibold text-sm text-blue-600">
-                  {isClinician ? "Screen a patient" : "Find matching trials"}
-                </span>
-              </button>
+              <Tooltip label={isClinician ? "Screen a patient" : "Find matching trials"}>
+                <button
+                  onClick={openCtaModal}
+                  className="flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
+                  aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
+                >
+                  <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
+                  <span className="font-semibold text-sm text-blue-600">
+                    {isClinician ? "Screen a patient" : "Find matching trials"}
+                  </span>
+                </button>
+              </Tooltip>
             </div>
           )}
           {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
@@ -580,21 +591,24 @@ function AssistantPanelBody({
           {!loading && !hydrationError && (
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
               {!scope && (
-                <button
-                  onClick={openCtaModal}
-                  className="md:hidden flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
-                  aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
-                  title={isClinician ? "Screen a patient" : "Find matching trials"}
-                >
-                  <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
-                </button>
+                <Tooltip label={isClinician ? "Screen a patient" : "Find matching trials"}>
+                  <button
+                    onClick={openCtaModal}
+                    className="md:hidden flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
+                    aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
+                  >
+                    <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
+                  </button>
+                </Tooltip>
               )}
               {scope ? (
                 !trialPanelOpen && (
-                  <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-12 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
-                    <PanelRight className="h-4 w-4" />
-                    Trials {scope.trialIds.length}
-                  </button>
+                  <Tooltip label="View this conversation's trials">
+                    <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-12 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
+                      <PanelRight className="h-4 w-4" />
+                      Trials {scope.trialIds.length}
+                    </button>
+                  </Tooltip>
                 )
               ) : (
                 <TrialPanelTrigger />

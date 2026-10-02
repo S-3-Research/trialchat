@@ -17,11 +17,27 @@ import type { TrialSearchCriteria, TrialSearchSort } from "@/lib/types/trialSear
  * existing criteria. Both bypass the LLM entirely (spec section 5/10).
  */
 
-const PHASE_OPTIONS = ["phase1", "phase2", "phase3", "phase4"] as const;
+const INTERVENTION_TYPE_OPTIONS = [
+  { value: "drug", label: "Drug" },
+  { value: "device", label: "Device" },
+  { value: "biological/vaccine", label: "Biological / Vaccine" },
+  { value: "procedure/surgery", label: "Procedure / Surgery" },
+  { value: "radiation", label: "Radiation" },
+  { value: "behavioral", label: "Behavioral" },
+  { value: "genetic", label: "Genetic" },
+  { value: "dietary_supplement", label: "Dietary Supplement" },
+  { value: "combination_product", label: "Combination Product" },
+  { value: "diagnostic_test", label: "Diagnostic Test" },
+  { value: "other", label: "Other" },
+] as const;
 const SEX_OPTIONS = [
   { value: "all", label: "Any" },
   { value: "male", label: "Male" },
   { value: "female", label: "Female" },
+] as const;
+const RECRUITING_OPTIONS = [
+  { value: "all", label: "All trials" },
+  { value: "recruiting", label: "Recruiting only" },
 ] as const;
 
 /** Bounds for the age-range dual slider — matches typical trial eligibility spans. */
@@ -56,11 +72,11 @@ export function TrialSearchModal({
   const [minAge, setMinAge] = useState(c.min_age ?? AGE_MIN);
   const [maxAge, setMaxAge] = useState(c.max_age ?? AGE_MAX);
   const [recruiting, setRecruiting] = useState(c.recruitingStatus ?? "all");
-  const [phases, setPhases] = useState<string[]>(c.phases ?? []);
+  const [interventionTypes, setInterventionTypes] = useState<string[]>(c.intervention_types ?? []);
   const [sort, setSort] = useState<TrialSearchSort>(search.sort ?? "relevance");
 
-  const togglePhase = (p: string) =>
-    setPhases((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
+  const toggleInterventionType = (v: string) =>
+    setInterventionTypes((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
 
   // Dragging the "min" thumb past "max" (or vice versa) clamps against
   // the other handle instead of crossing over it — a plain pair of
@@ -82,7 +98,7 @@ export function TrialSearchModal({
     max_age:
       ageMode === "range" && (minAge > AGE_MIN || maxAge < AGE_MAX) ? maxAge : undefined,
     recruitingStatus: recruiting === "recruiting" ? "recruiting" : "all",
-    phases: phases.length ? phases : undefined,
+    intervention_types: interventionTypes.length ? interventionTypes : undefined,
   };
 
   const canSubmit = mode === "refine" || Boolean(conditions || city);
@@ -138,8 +154,16 @@ export function TrialSearchModal({
               </p>
             </div>
 
-            {/* Form */}
-            <div className="space-y-4 max-h-[55vh] overflow-y-auto sidebar-scrollbar pr-1">
+            {/* Form — fade-masked top/bottom edges (same technique as
+                TrialPanelShell's scroll area) so content doesn't look
+                abruptly clipped mid-row when the list is scrollable. */}
+            <div
+              className="space-y-4 max-h-[55vh] overflow-y-auto sidebar-scrollbar pr-1 py-1.5"
+              style={{
+                maskImage: "linear-gradient(to bottom, transparent, black 0.375rem, black calc(100% - 0.375rem), transparent 100%)",
+                WebkitMaskImage: "linear-gradient(to bottom, transparent, black 0.375rem, black calc(100% - 0.375rem), transparent 100%)",
+              }}
+            >
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                   Condition(s)
@@ -212,21 +236,30 @@ export function TrialSearchModal({
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                   Sex
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {SEX_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setSex(opt.value)}
-                      className={`w-full rounded-xl px-3 py-2 text-sm font-medium transition-all ${
-                        sex === opt.value
-                          ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
-                          : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Sex">
+                  {SEX_OPTIONS.map((opt) => {
+                    const checked = sex === opt.value;
+                    return (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-2 w-full rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                          checked
+                            ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
+                            : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          role="radio"
+                          aria-checked={checked}
+                          checked={checked}
+                          onChange={() => setSex(opt.value)}
+                          className="shrink-0 w-4 h-4 rounded accent-blue-600"
+                        />
+                        {opt.label}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -317,51 +350,59 @@ export function TrialSearchModal({
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                   Recruitment status
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRecruiting("all")}
-                    className={`w-full rounded-xl px-3 py-2 text-sm font-medium transition-all ${
-                      recruiting === "all"
-                        ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
-                        : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
-                    }`}
-                  >
-                    All statuses
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecruiting("recruiting")}
-                    className={`w-full rounded-xl px-3 py-2 text-sm font-medium transition-all ${
-                      recruiting === "recruiting"
-                        ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
-                        : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
-                    }`}
-                  >
-                    Recruiting only
-                  </button>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Recruitment status">
+                  {RECRUITING_OPTIONS.map((opt) => {
+                    const checked = recruiting === opt.value;
+                    return (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-2 w-full rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                          checked
+                            ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
+                            : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          role="radio"
+                          aria-checked={checked}
+                          checked={checked}
+                          onChange={() => setRecruiting(opt.value)}
+                          className="shrink-0 w-4 h-4 rounded accent-blue-600"
+                        />
+                        {opt.label}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                  Phase
+                  Intervention type
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {PHASE_OPTIONS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => togglePhase(p)}
-                      className={`rounded-xl px-3 py-2 text-sm font-medium transition-all ${
-                        phases.includes(p)
-                          ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
-                          : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
-                      }`}
-                    >
-                      {p.replace("phase", "Phase ")}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-2">
+                  {INTERVENTION_TYPE_OPTIONS.map((opt) => {
+                    const checked = interventionTypes.includes(opt.value);
+                    return (
+                      <label
+                        key={opt.value}
+                        className={`flex items-center gap-2 w-full rounded-xl px-3 py-2 text-sm font-medium transition-all cursor-pointer ${
+                          checked
+                            ? "border border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 shadow-sm shadow-blue-500/10"
+                            : "border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleInterventionType(opt.value)}
+                          className="shrink-0 w-4 h-4 rounded accent-blue-600"
+                        />
+                        {opt.label}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             </div>

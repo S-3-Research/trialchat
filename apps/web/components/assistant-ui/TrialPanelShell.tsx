@@ -1,6 +1,7 @@
 "use client";
 import type { ReactNode } from "react";
 import { PanelRightClose } from "lucide-react";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 export const PANEL_PADDING_X = "pl-6 pr-5";
 
@@ -17,7 +18,9 @@ export function TrialPanelShell({ title, count, onClose, description, children }
       <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}
         {count > 0 && <span className="ml-2 inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-blue-100 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 text-xs font-bold">{count}</span>}
       </h2>
-      <button onClick={onClose} aria-label="Collapse trial panel" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><PanelRightClose className="w-4 h-4" strokeWidth={2} /></button>
+      <Tooltip label="Collapse trial panel">
+        <button onClick={onClose} aria-label="Collapse trial panel" className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><PanelRightClose className="w-4 h-4" strokeWidth={2} /></button>
+      </Tooltip>
     </div>
     {description && <div className={`shrink-0 pb-3 ${PANEL_PADDING_X}`}>{description}</div>}
     <div className="relative flex-1 min-h-0">

@@ -23,6 +23,7 @@ import type { ChatStarterPrompt } from "@/lib/types/prompts";
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { GetTrialsToolUI, WebSearchToolUI, KnowledgeBaseToolUI, ThinkingAccordion, ThinkingDots, ThreadThinkingIndicator } from "@/components/assistant-ui/tool-ui";
 import { useTrialSearch } from "@/contexts/TrialSearchContext";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * Thread UI built from native assistant-ui primitives, styled to match the
@@ -272,14 +273,16 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
               <span className="truncate">
                 Re: {trial.title ?? trial.id}
               </span>
-              <button
-                type="button"
-                aria-label="Clear trial scope"
-                onClick={() => trial.id && toggleTrialSelection(trial.id)}
-                className="shrink-0 rounded-full p-0.5 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
-              >
-                <span className="block w-3 h-3 leading-none text-center text-sm">×</span>
-              </button>
+              <Tooltip label="Clear trial scope">
+                <button
+                  type="button"
+                  aria-label="Clear trial scope"
+                  onClick={() => trial.id && toggleTrialSelection(trial.id)}
+                  className="shrink-0 rounded-full p-0.5 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                >
+                  <span className="block w-3 h-3 leading-none text-center text-sm">×</span>
+                </button>
+              </Tooltip>
             </span>
           ))}
         </div>
@@ -300,24 +303,28 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
           <ComposerPrimitive.Dictate
             asChild
           >
-            <button
-              type="button"
-              aria-label="Start voice input"
-              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 hover:border-blue-300 dark:text-slate-500 dark:hover:text-blue-400 transition-colors disabled:opacity-30"
-            >
-              <Mic className="w-4 h-4" strokeWidth={1.75} />
-            </button>
+            <Tooltip label="Start voice input">
+              <button
+                type="button"
+                aria-label="Start voice input"
+                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 hover:border-blue-300 dark:text-slate-500 dark:hover:text-blue-400 transition-colors disabled:opacity-30"
+              >
+                <Mic className="w-4 h-4" strokeWidth={1.75} />
+              </button>
+            </Tooltip>
           </ComposerPrimitive.Dictate>
         </AuiIf>
         <AuiIf condition={(s) => s.composer.dictation != null}>
           <ComposerPrimitive.StopDictation asChild>
-            <button
-              type="button"
-              aria-label="Stop voice input"
-              className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full border border-blue-300 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:border-blue-500/40 dark:text-blue-400 animate-pulse transition-colors"
-            >
-              <Square className="w-3.5 h-3.5 fill-current" strokeWidth={0} />
-            </button>
+            <Tooltip label="Stop voice input">
+              <button
+                type="button"
+                aria-label="Stop voice input"
+                className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full border border-blue-300 bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:border-blue-500/40 dark:text-blue-400 animate-pulse transition-colors"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" strokeWidth={0} />
+              </button>
+            </Tooltip>
           </ComposerPrimitive.StopDictation>
         </AuiIf>
         <ThreadPrimitive.If running>

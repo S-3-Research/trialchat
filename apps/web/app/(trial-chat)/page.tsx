@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useFontSize } from "@/contexts/FontSizeContext";
@@ -17,15 +17,6 @@ export default function Home() {
   const { fontSize, setFontSize } = useFontSize();
   const nextFontSize = { small: 'medium', medium: 'large', large: 'small' } as const;
   const fontSizeLabel = { small: 'A−', medium: 'A', large: 'A+' } as const;
-  // Read the raw query string directly from window.location instead of
-  // useSearchParams() so this doesn't force a Suspense boundary around the
-  // whole landing page during static generation.
-  const [chatHref, setChatHref] = useState("/chat");
-  useEffect(() => {
-    const qs = window.location.search;
-    if (qs) setChatHref(`/chat${qs}`);
-  }, []);
-
 
   return (
     <>
@@ -342,9 +333,8 @@ export default function Home() {
 
                         {/* CTA Button Area */}
                         <div className="relative z-10 flex flex-col gap-3">
-                            {/* Button 1: Learn about Alzheimer's disease — hidden, kept for future re-enable */}
-                            {false && (
-                            <Link href={chatHref} className="w-full block group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-200 to-slate-400 p-[1px] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900">
+                            {/* Button 1: Learn about Alzheimer's disease — black CTA, goes to chat with intake form shown (if not already seen) */}
+                            <Link href="/chat?skip_intake=0&open_match=0" className="w-full block group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-200 to-slate-400 p-[1px] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900">
                                 <div className="relative h-full w-full rounded-xl bg-slate-900 px-6 py-4 transition-all group-hover/btn:bg-slate-800">
                                     <div className="flex items-center justify-between">
                                         <span className="font-semibold text-slate-200 group-hover/btn:text-white transition-colors">Learn about Alzheimer&apos;s disease</span>
@@ -354,7 +344,6 @@ export default function Home() {
                                     </div>
                                 </div>
                             </Link>
-                            )}
 
                             {/* Button 2: Match me to Trials — blue shimmer */}
                             <div className="shimmer-border-btn transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-500/25">
@@ -396,53 +385,6 @@ export default function Home() {
                             )}
                         </div>
 
-                        {/* Space between CTA and Feature Stack */}
-                        <div className="flex items-center justify-center mt-4 mb-4">
-                            {/* <div className={`h-px w-16 ${isLight ? 'bg-slate-300/70' : 'bg-white/20'}`}></div> */}
-                        </div>
-
-                        {/* Feature Stack */}
-                        <div className="space-y-3 relative z-10">
-                            <p className={`text-md font-semibold leading-relaxed mb-3 transition-colors duration-300 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>How we help.</p>
-                            {/* Feature 1 */}
-                            <div className="glass-card p-3.5 rounded-xl flex items-center gap-3 cursor-default">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-inner opacity-80 transition-colors duration-300 ${isLight ? 'bg-blue-50/70 text-blue-500' : 'bg-slate-800/35 text-blue-300'}`}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className={`text-[13px] font-medium transition-colors duration-300 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Personalized Education</h3>
-                                    <p className={`text-[11px] transition-colors duration-300 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Learn about Alzheimer&apos;s disease on your terms.</p>
-                                </div>
-                            </div>
-
-                            {/* Feature 2 */}
-                            <div className="glass-card p-3.5 rounded-xl flex items-center gap-3 cursor-default">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-inner opacity-80 transition-colors duration-300 ${isLight ? 'bg-purple-50/70 text-purple-500' : 'bg-slate-800/35 text-purple-300'}`}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className={`text-[13px] font-medium transition-colors duration-300 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Smart Trial Matching</h3>
-                                    <p className={`text-[11px] transition-colors duration-300 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Find studies fitting your needs & location.</p>
-                                </div>
-                            </div>
-
-                            {/* Feature 3 */}
-                            <div className="glass-card p-3.5 rounded-xl flex items-center gap-3 cursor-default">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-inner opacity-80 transition-colors duration-300 ${isLight ? 'bg-emerald-50/70 text-emerald-500' : 'bg-slate-800/35 text-emerald-300'}`}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <h3 className={`text-[13px] font-medium transition-colors duration-300 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Simplified Engagement</h3>
-                                    <p className={`text-[11px] transition-colors duration-300 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Connect directly to trial sites.</p>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>{/* end card hover div */}
 

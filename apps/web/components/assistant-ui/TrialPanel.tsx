@@ -12,6 +12,7 @@ import type { TrialSearchState } from "@/lib/types/trialSearch";
 import { TrialPanelShell, PANEL_PADDING_X } from "./TrialPanelShell";
 import { TrialCard, toTitleCase } from "./TrialCard";
 import { TrialSearchModal } from "@/components/assistant-ui/TrialSearchModal";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /**
  * Trial Panel's width as a percentage of the overall chat+panel container
@@ -76,7 +77,7 @@ function buildCriteriaChips(search: TrialSearchState): string[] {
   const loc = [c.city, c.state].filter(Boolean).join(", ");
   if (loc) chips.push(c.pref_distance ? `${loc} · \u2264${c.pref_distance} mi` : loc);
   if (c.recruitingStatus === "recruiting") chips.push("Recruiting");
-  if (c.phases?.length) chips.push(c.phases.join(" / "));
+  if (c.intervention_types?.length) chips.push(c.intervention_types.join(" / "));
   if (c.sex && c.sex !== "all") chips.push(c.sex);
   if (c.age !== undefined) chips.push(`Age ${c.age}`);
   else if (c.min_age !== undefined || c.max_age !== undefined) {
@@ -174,13 +175,13 @@ function EmptyState() {
             Include active, not recruiting
           </button>
         )}
-        {search.criteria.phases?.length ? (
+        {search.criteria.intervention_types?.length ? (
           <button
             type="button"
-            onClick={() => updateTrialSearch({ phases: undefined }, "panel")}
+            onClick={() => updateTrialSearch({ intervention_types: undefined }, "panel")}
             className="text-left text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
           >
-            Clear phase filter
+            Clear intervention type filter
           </button>
         ) : null}
       </div>
@@ -343,17 +344,19 @@ export function TrialPanelTrigger() {
   if (panelOpen) return null;
   const count = search.pagination.total;
   return (
-    <button
-      onClick={openPanel}
-      aria-label="Open trial panel"
-      className="flex items-center justify-center gap-1.5 h-12 px-4 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-    >
-      <PanelRight className="w-4 h-4" strokeWidth={2} />
-      {count > 0 && (
-        <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-          Trials {count}
-        </span>
-      )}
-    </button>
+    <Tooltip label="Open trial panel">
+      <button
+        onClick={openPanel}
+        aria-label="Open trial panel"
+        className="flex items-center justify-center gap-1.5 h-12 px-4 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+      >
+        <PanelRight className="w-4 h-4" strokeWidth={2} />
+        {count > 0 && (
+          <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+            Trials {count}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   );
 }

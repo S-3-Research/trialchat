@@ -492,6 +492,26 @@ body {
 }
 
 /*
+ * Tooltip entrance (components/ui/Tooltip.tsx) — small scale+fade so the
+ * portal-rendered bubble doesn't just pop in at full size the instant
+ * the 150ms hover delay elapses.
+ */
+@keyframes tooltip-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-tooltip-in {
+  animation: tooltip-in 120ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-tooltip-in {
+    animation-duration: 1ms;
+  }
+}
+
+/*
  * Dual-thumb age range slider (TrialSearchModal.tsx) — two native
  * <input type="range"> elements stacked on the same track. Each input's
  * own track/fill is made fully transparent (drawn manually via a

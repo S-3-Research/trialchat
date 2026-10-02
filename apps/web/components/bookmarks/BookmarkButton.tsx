@@ -4,6 +4,7 @@ import { Bookmark } from "lucide-react";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { toTrialSnapshot } from "@/lib/bookmarks";
 import type { Trial } from "@/lib/types/trialSearch";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 /** `compact` renders a bare inline icon button (no padding/background), meant to be
  * embedded inside another pill/badge (e.g. the card's #NN index pill) rather than
@@ -19,15 +20,18 @@ export function BookmarkButton({ trial, sourceThreadId, sourceSearchId, compact,
   const onClick = (e: React.MouseEvent) => { e.stopPropagation(); setBookmarked(trialId, !active, toTrialSnapshot(trial), { sourceThreadId, sourceSearchId }); };
 
   if (pillClassName) {
-    return <button type="button" disabled={!ready} aria-pressed={active} aria-label={`${active ? "Remove bookmark for" : "Bookmark"} ${trialId}`} title={active ? "Remove bookmark" : "Bookmark trial"}
-      className={`${pillClassName} group hover:brightness-95 dark:hover:brightness-125 active:scale-95 transition-transform duration-150 disabled:opacity-40 disabled:active:scale-100`}
-      onClick={onClick}>
-      {children}
-      <Bookmark className="h-3 w-3 transition-transform duration-150 group-hover:scale-125" fill={active ? "currentColor" : "none"} />
-    </button>;
+    return <Tooltip label={active ? "Remove bookmark" : "Bookmark trial"}>
+      <button type="button" disabled={!ready} aria-pressed={active} aria-label={`${active ? "Remove bookmark for" : "Bookmark"} ${trialId}`}
+        className={`${pillClassName} group hover:brightness-95 dark:hover:brightness-125 active:scale-95 transition-transform duration-150 disabled:opacity-40 disabled:active:scale-100`}
+        onClick={onClick}>
+        {children}
+        <Bookmark className="h-3 w-3 transition-transform duration-150 group-hover:scale-125" fill={active ? "currentColor" : "none"} />
+      </button>
+    </Tooltip>;
   }
 
-  const button = <button type="button" disabled={!ready} aria-pressed={active} aria-label={`${active ? "Remove bookmark for" : "Bookmark"} ${trialId}`} title={active ? "Remove bookmark" : "Bookmark trial"}
+  const button = <Tooltip label={active ? "Remove bookmark" : "Bookmark trial"}>
+    <button type="button" disabled={!ready} aria-pressed={active} aria-label={`${active ? "Remove bookmark for" : "Bookmark"} ${trialId}`}
       className={compact
         ? `rounded-full p-0.5 transition-all duration-150 hover:scale-110 active:scale-90 disabled:opacity-40 disabled:hover:scale-100 ${
             active
@@ -37,7 +41,8 @@ export function BookmarkButton({ trial, sourceThreadId, sourceSearchId, compact,
         : "rounded-lg p-2 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950 disabled:opacity-40 transition-all duration-150 hover:scale-105 active:scale-90"}
       onClick={onClick}>
       <Bookmark className={compact ? "h-3 w-3" : "h-4 w-4"} fill={active ? "currentColor" : "none"} />
-    </button>;
+    </button>
+  </Tooltip>;
   if (compact) return button;
   return <span className="inline-flex flex-col items-end">
     {button}
