@@ -56,8 +56,12 @@ export function ThreadNavigation({ enabled = true }: { enabled?: boolean }) {
   return error ? <p role="alert" className="p-3 text-red-600">{error}</p> : null;
 }
 
-/** Live collection differences are informational; this component never writes scope. */
-export function ThreadScopeHeader({ scope, onViewTrials, bothPanelsOpen }: { scope: TrialSnapshot; onViewTrials: () => void; bothPanelsOpen?: boolean }) {
+/** Live collection differences are informational; this component never writes scope.
+ * Rendered directly below the Chat column's "Chat" header row (desktop and
+ * mobile), so it no longer needs a large top offset to clear floating
+ * controls — a small fixed margin matching the header's own padding is
+ * enough. */
+export function ThreadScopeHeader({ scope, onViewTrials }: { scope: TrialSnapshot; onViewTrials: () => void }) {
   const { bookmarks, ready } = useBookmarks();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -74,8 +78,8 @@ export function ThreadScopeHeader({ scope, onViewTrials, bothPanelsOpen }: { sco
       window.location.assign(`/chat?thread=${encodeURIComponent(id)}`);
     } catch { setBusy(false); setError("Could not create the conversation. Please try again."); }
   };
-  return <div className={`${bothPanelsOpen ? "mt-5" : "mt-20"} mx-5 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-slate-700 dark:text-slate-200`}>
-    <div className="flex flex-wrap items-center gap-3"><strong>Discussing {scope.trialIds.length} {scope.trialIds.length === 1 ? "trial" : "trials"}</strong><button onClick={onViewTrials} className="text-blue-600 dark:text-blue-400">View trials</button></div>
+  return <div className="shrink-0 mx-4 mb-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-slate-700 dark:text-slate-200">
+    <div className="flex flex-wrap items-center gap-3"><strong>Discussing {scope.trialIds.length} {scope.trialIds.length === 1 ? "trial" : "trials"}</strong></div>
     {changed && <div className="mt-2 space-y-1">
       <p>Your bookmarks have changed since this conversation started.</p>
       <p>This conversation is still using the original {scope.trialIds.length} {scope.trialIds.length === 1 ? "trial" : "trials"}.</p>

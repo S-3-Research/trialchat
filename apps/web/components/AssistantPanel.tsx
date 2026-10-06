@@ -2,7 +2,7 @@
 
 import type { ThreadContextScope } from "@/lib/bookmarks";
 import { BookmarkSnapshotPanel } from "@/components/bookmarks/BookmarkSnapshotPanel";
-import { PanelRight, Zap } from "lucide-react";
+import { PanelRight, PanelRightClose, Maximize2, Minimize2, MessageSquareText } from "lucide-react";
 import { ThreadNavigation, ThreadScopeHeader } from "@/components/bookmarks/ThreadScope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AssistantRuntimeProvider, ThreadListPrimitive, useAui, useAuiState } from "@assistant-ui/react";
@@ -26,12 +26,8 @@ import { IntakeFormModal } from "@/components/IntakeFormModal";
 import { MatchProfileModal } from "@/components/MatchProfileModal";
 import type { MatchProfile } from "@/components/MatchProfileModal";
 import { ClinicianModal } from "@/components/ClinicianModal";
-import {
-  TrialPanel,
-  TrialPanelTrigger,
-  TRIAL_PANEL_WIDTH_PERCENT,
-  TRIAL_PANEL_MOBILE_WIDTH,
-} from "@/components/assistant-ui/TrialPanel";
+import { TrialPanel } from "@/components/assistant-ui/TrialPanel";
+import { PANEL_PADDING_X } from "@/components/assistant-ui/TrialPanelShell";
 import {
   TrialSearchProvider,
   useTrialSearch,
@@ -49,7 +45,6 @@ import {
 } from "@/lib/config";
 import { toChatStarterPrompts } from "@/lib/types/prompts";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { useLayoutTier } from "@/hooks/useLayoutTier";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { INTAKE_STORAGE_KEY, type IntakeData } from "@/lib/types/intake";
 import { useVoiceInputMode } from "@/contexts/VoiceInputModeContext";
@@ -57,6 +52,17 @@ import {
   createWebSpeechDictationAdapter,
   WhisperDictationAdapter,
 } from "@/lib/voiceDictationAdapters";
+
+/**
+ * Chat is now the SECONDARY, collapsible surface (the Trial Panel is the
+ * persistent main one — see AssistantPanelBody below), so these width
+ * constants — previously owned by TrialPanel.tsx — now describe the chat
+ * column instead: a percentage of the overall container for the desktop
+ * docked column, and a near-full-width overlay sheet on mobile.
+ */
+const CHAT_PANEL_WIDTH_PERCENT = 36;
+const CHAT_PANEL_MOBILE_WIDTH = "min(92%, 30rem)";
+
 
 /**
  * LangGraph-backed chat panel with personalized starter prompts and a
@@ -79,12 +85,6 @@ export function AssistantPanel() {
   // intake change, tearing down the active run).
   const intakeDataRef = useRef<IntakeData | null>(null);
   intakeDataRef.current = intakeData;
-  // Sidebar defaults to collapsed on both desktop and mobile — a slide-out
-  // panel toggled via the PanelLeft trigger (see the floating top-left
-  // controls below) rather than a permanently-docked column, so the chat
-  // surface gets the full panel width by default.
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   // Stable runtime slot identity owns the Panel state; the remote id only
   // selects its persistence endpoint. Assigning a new chat its remote id
   // must not discard edits made before its first message.
@@ -267,8 +267,6 @@ export function AssistantPanel() {
               contextScope={activeThread.contextScope}
               hydrationError={activeThread.error}
               isMobile={isMobile}
-              sidebarOpen={sidebarOpen}
-              setSidebarOpen={setSidebarOpen}
               greeting={greeting}
               prompts={prompts}
               intakeData={intakeData}
@@ -377,8 +375,6 @@ function AssistantPanelBody({
   contextScope,
   hydrationError,
   isMobile,
-  sidebarOpen,
-  setSidebarOpen,
   greeting,
   prompts,
   intakeData,
@@ -387,26 +383,105 @@ function AssistantPanelBody({
   contextScope?: ThreadContextScope;
   hydrationError?: string;
   isMobile: boolean;
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
   greeting: string;
   prompts: ReturnType<typeof toChatStarterPrompts>;
   intakeData: IntakeData | null;
 }) {
-  const { panelOpen: trialPanelOpen, closePanel: closeTrialPanel, openPanel, isHydrating } = useTrialSearch();
+  const { panelOpen: trialPanelOpen, openPanel, isHydrating, search } = useTrialSearch();
   const runtimeKey = useAuiState((s) => s.optional.threadListItem?.id);
   const loading = isHydrating || runtimeKey !== activeThreadKey;
   const scope = !loading && contextScope && contextScope.type !== "trial_search" ? contextScope : undefined;
 
-  // "Find matching trials" / "Screen a patient" CTA — moved here (from
-  // ChatSurface) so its mobile icon-only form can be grouped, via a
-  // shared flex row, with the Trial Panel trigger it used to collide with
-  // (see the floating-controls row rendered below).
+  // Unified desktop layout state (spec: Trial Panel + Chat default to a
+  // side-by-side "dual" layout; either one can take over the whole
+  // surface via its own fullscreen toggle — matchCTA lands in "dual",
+  // eduCTA lands directly in "chat-full", see the `open_chat`/`open_match`
+  // URL params below). Deliberately a single enum rather than independent
+  // booleans so "both fullscreen at once" is structurally unrepresentable.
+  const [layoutMode, setLayoutMode] = useState<"dual" | "trial-full" | "chat-full">("dual");
+  // Bookmark-snapshot threads are always dual — fullscreen only makes
+  // sense for the regular Trial Panel/Chat pair, so scope entry forces
+  // (and locks) the layout back to "dual" instead of leaving a stale
+  // fullscreen state the user can't easily recover from.
+  const lockDual = !!scope;
+  useEffect(() => {
+    if (lockDual) setLayoutMode("dual");
+  }, [lockDual]);
+  const showTrial = !lockDual && layoutMode === "chat-full" ? false : true;
+  const showChat = !lockDual && layoutMode === "trial-full" ? false : true;
+  const isTrialFullscreen = !lockDual && layoutMode === "trial-full";
+  const isChatFullscreen = !lockDual && layoutMode === "chat-full";
+
+  // Search History is a left-anchored drawer, independent of layoutMode:
+  // in "dual" it's an inline column that pushes Chat into an icon rail
+  // (Trial Panel keeps its width); in either fullscreen mode there's only
+  // one panel on screen, so it floats as a scrim+overlay instead.
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Mobile keeps its own simple mutex (unrelated to desktop's
+  // layoutMode/historyOpen — mobile has no dual/fullscreen concept, just
+  // the persistent Trial Panel plus two independent left/right sheets).
+  const [mobileSheet, setMobileSheet] = useState<"history" | "chat" | null>(null);
+
+  // Opens Chat for the user without caring whether we're on mobile or
+  // which desktop layoutMode we're currently in — used wherever the app
+  // itself (not a manual header click) needs to surface Chat, e.g. after
+  // composing a Match/Clinician message, or a trial card's "Ask" action.
+  const openChatForRun = () => {
+    if (isMobile) setMobileSheet("chat");
+    else if (isTrialFullscreen) setLayoutMode("dual");
+  };
+  // Inverse: returns to whichever state leaves Chat not the sole focus,
+  // without forcibly closing it if it's already just part of the default
+  // dual layout.
+  const closeChatToDefault = () => {
+    if (isMobile) setMobileSheet((current) => (current === "chat" ? null : current));
+    else if (isChatFullscreen) setLayoutMode("dual");
+  };
+
+  // Trial Panel is now the persistent main surface — ensure it's
+  // marked open as soon as this thread's state is ready, rather than
+  // relying on the user to open it (it has no collapse control anymore;
+  // see TrialPanel.tsx). The bookmark-"scope" snapshot view still owns
+  // its own open/close behavior via the same `trialPanelOpen` flag.
+  useEffect(() => {
+    if (!loading && !scope) openPanel();
+  }, [loading, scope, openPanel]);
+
+  // "Screen a patient" modal is still reachable via the homepage's
+  // direct matching entry point (the `open_match=1` URL param handled
+  // below) even though the standalone "Find matching trials" CTA button
+  // has been removed from the floating controls (spec: structured search
+  // via the Trial Panel is now the primary path).
   const aui = useAui();
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [showClinicianModal, setShowClinicianModal] = useState(false);
   const isClinician = intakeData?.role === "clinician";
-  const openCtaModal = () => (isClinician ? setShowClinicianModal(true) : setShowMatchModal(true));
+
+  // "Find Your Match"/clinician pre-screen are the one remaining entry
+  // point that composes a message and sends it through Chat rather than
+  // calling the trial-search API directly (it still needs the LLM to
+  // interpret free text into criteria) — unlike a normal chat message,
+  // the user never typed anything themselves, so auto-opening Chat while
+  // the run is in flight and auto-closing it again once results land
+  // keeps the experience feeling like a single Panel action instead of a
+  // detour through Chat. Only ever *closes* Chat (never forces it back
+  // open if the user already closed it), and only on a genuine new
+  // success, not on mount/hydration.
+  const [autoCloseChatPending, setAutoCloseChatPending] = useState(false);
+  const prevSearchStatusRef = useRef(search.status);
+  useEffect(() => {
+    if (
+      autoCloseChatPending &&
+      prevSearchStatusRef.current !== "success" &&
+      search.status === "success"
+    ) {
+      closeChatToDefault();
+      setAutoCloseChatPending(false);
+    }
+    prevSearchStatusRef.current = search.status;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search.status, autoCloseChatPending]);
   const openedSnapshotRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (scope && !isMobile && openedSnapshotRef.current !== activeThreadKey) {
@@ -415,7 +490,10 @@ function AssistantPanelBody({
     }
   }, [scope, isMobile, activeThreadKey, openPanel]);
   // Preserve the homepage's direct matching entry point without reopening it
-  // when the thread URL changes. Scope hydration must finish first.
+  // when the thread URL changes. Scope hydration must finish first. Also
+  // handles the Education CTA's `open_chat=1` — lands directly in
+  // "chat-full" (desktop) / the chat sheet (mobile) instead of the default
+  // dual layout.
   const entryHandled = useRef(false);
   useEffect(() => {
     if (loading || entryHandled.current) return;
@@ -425,202 +503,332 @@ function AssistantPanelBody({
       openPanel();
       if (isClinician) setShowClinicianModal(true);
       else setShowMatchModal(true);
+    } else if (url.searchParams.get("open_chat") === "1" && !scope) {
+      if (isMobile) setMobileSheet("chat");
+      else setLayoutMode("chat-full");
     }
     url.searchParams.delete("open_match");
+    url.searchParams.delete("open_chat");
     url.searchParams.delete("skip_intake");
     window.history.replaceState(window.history.state, "", url);
-  }, [loading, scope, isClinician, openPanel]);
+  }, [loading, scope, isClinician, isMobile, openPanel]);
 
+  // Trial Panel content: this is now the persistent MAIN surface (not a
+  // collapsible docked column), so it's rendered in-flow for both desktop
+  // and mobile — see the single "main" wrapper below (no more separate
+  // docked-column vs. mobile-sheet branches for it). The non-scope case
+  // (plain `<TrialPanel>`) is rendered directly in JSX below instead of
+  // here, since it needs the header icon row passed in as a prop.
   const panel = loading ? <p role="status" className="p-6 text-sm text-slate-500">Loading conversation trials…</p>
     : hydrationError ? <p role="alert" className="p-6 text-sm text-red-600">{hydrationError}</p>
-    : scope ? (trialPanelOpen ? <BookmarkSnapshotPanel key={activeThreadKey} scope={scope} onClose={closeTrialPanel} /> : null)
-    : <TrialPanel />;
-
-  // At medium widths keep the newly opened panel. On a resize from the
-  // three-column layout, prefer the Trial Panel rather than closing both.
-  const layoutTier = useLayoutTier();
-  const previousPanels = useRef({ sidebarOpen, trialPanelOpen });
-  useEffect(() => {
-    const sidebarJustOpened = sidebarOpen && !previousPanels.current.sidebarOpen;
-    previousPanels.current = { sidebarOpen, trialPanelOpen };
-    if (layoutTier !== "compact" || !sidebarOpen || !trialPanelOpen) return;
-    if (sidebarJustOpened) closeTrialPanel();
-    else setSidebarOpen(false);
-  }, [layoutTier, sidebarOpen, trialPanelOpen, closeTrialPanel, setSidebarOpen]);
+    : scope ? (trialPanelOpen ? (
+        <BookmarkSnapshotPanel
+          key={activeThreadKey}
+          scope={scope}
+          // Same New Search / Search History icon row as the main Trial
+          // Panel's header (see TrialPanelHeaderIcons below) — a bookmark
+          // snapshot is still just another Trial Panel view, so it
+          // shouldn't lose access to those controls. It shows the same
+          // (disabled) fullscreen button as the regular Trial Panel/Chat
+          // pair for visual consistency — see `fullscreenDisabled` on
+          // TrialPanelShell — instead of a separate collapse button.
+          headerActions={
+            <TrialPanelHeaderIcons
+              isMobile={isMobile}
+              historyOpen={isMobile ? mobileSheet === "history" : historyOpen}
+              onToggleHistory={() =>
+                isMobile
+                  ? setMobileSheet((v) => (v === "history" ? null : "history"))
+                  : setHistoryOpen((v) => !v)
+              }
+              chatOpen={mobileSheet === "chat"}
+              onToggleChat={() => setMobileSheet((v) => (v === "chat" ? null : "chat"))}
+            />
+          }
+        />
+      ) : null)
+    : null;
 
   return (
     <>
       {/*
-         * Desktop: collapsible sidebar (default closed) that slides in/out
-         * by animating its own width, rather than being permanently
-         * docked — the inner column keeps a fixed w-64 so its content
-         * doesn't reflow/wrap mid-transition, only the outer wrapper's
-         * width (and thus how much of it is visible) animates.
+         * Trial Panel — now the persistent MAIN surface (structured
+         * search/filters are the primary way to find trials; chat is
+         * secondary by default — see `layoutMode` above). Hidden entirely
+         * only in "chat-full". The New Search / Search History icon row
+         * lives in its own header (passed as `headerActions`); the
+         * fullscreen toggle is rendered by TrialPanelShell itself via
+         * `onToggleFullscreen`/`isFullscreen`.
+         */}
+      <div className="relative flex flex-1 min-w-0">
+        {/* Search History — left-anchored drawer, independent of
+         * layoutMode. In "dual" it's an inline column (pushes Chat into
+         * an icon rail, see the Chat column below) that animates its
+         * width open/closed exactly like the Chat column's own width
+         * transitions below, rather than mounting/unmounting abruptly;
+         * its inner content keeps a fixed w-64 so it doesn't reflow
+         * mid-transition. Squeeze vs. overlay depends on layoutMode: in
+         * "dual" there are already two panels sharing the row, so History
+         * floats as a scrim+overlay instead of squeezing either one (see
+         * the overlay block further below); in either fullscreen mode
+         * there's only a single panel, so History can simply squeeze it
+         * inline here without needing a separate icon-rail affordance.
+         * Mobile renders its own overlay sheet instead (further below). */}
+        {(() => {
+          const historyInline = !isMobile && historyOpen && layoutMode !== "dual";
+          return (
+            <div
+              className={`hidden md:flex md:flex-col overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                historyInline ? "border-r border-slate-200/70 dark:border-slate-700/60" : ""
+              }`}
+              style={{ width: historyInline ? "16rem" : "0" }}
+            >
+              <SearchHistoryPanelContent onClose={() => setHistoryOpen(false)} />
+            </div>
+          );
+        })()}
+
+        {(() => {
+          // Mirrors the Chat column's explicit-percentage-width approach
+          // (instead of conditionally mounting/unmounting) so toggling
+          // Trial Panel fullscreen animates smoothly instead of snapping.
+          // Mobile always gets the full width — Chat is an overlay sheet
+          // there, never an inline sibling, so there's nothing to share
+          // space with.
+          const trialWidthPercent = isMobile
+            ? 100
+            : layoutMode === "chat-full"
+            ? 0
+            : layoutMode === "trial-full"
+            ? 100
+            : 100 - CHAT_PANEL_WIDTH_PERCENT;
+          // When History squeezes in inline (fullscreen modes only — see
+          // the block above), it claims a fixed 16rem out of the row, so
+          // the single "full" panel must shrink by that same amount via
+          // calc() instead of staying a flat 100% — otherwise the row's
+          // total width exceeds its container and History gets clipped by
+          // the outer rounded-[32px] wrapper's overflow-hidden.
+          const historyInline = !isMobile && historyOpen && layoutMode !== "dual";
+          const trialWidth = isMobile
+            ? "100%"
+            : historyInline && trialWidthPercent === 100
+            ? "calc(100% - 16rem)"
+            : `${trialWidthPercent}%`;
+          return (
+            <div
+              className="relative min-w-0 flex flex-col overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              style={{ width: trialWidth }}
+            >
+            {!scope ? (
+              <TrialPanel
+                onAsk={openChatForRun}
+                isFullscreen={!isMobile && isTrialFullscreen}
+                onToggleFullscreen={
+                  isMobile || lockDual ? undefined : () => setLayoutMode(isTrialFullscreen ? "dual" : "trial-full")
+                }
+                headerActions={
+                  <TrialPanelHeaderIcons
+                    isMobile={isMobile}
+                    historyOpen={isMobile ? mobileSheet === "history" : historyOpen}
+                    onToggleHistory={() =>
+                      isMobile
+                        ? setMobileSheet((v) => (v === "history" ? null : "history"))
+                        : setHistoryOpen((v) => !v)
+                    }
+                    chatOpen={mobileSheet === "chat"}
+                    onToggleChat={() => setMobileSheet((v) => (v === "chat" ? null : "chat"))}
+                  />
+                }
+              />
+            ) : (
+              panel
+            )}
+            {!loading && !hydrationError && scope && !trialPanelOpen && (
+              <div className="absolute top-4 right-4 z-20">
+                <Tooltip label="View this conversation's trials">
+                  <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-10 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
+                    <PanelRight className="h-4 w-4" />
+                    Trials {scope.trialIds.length}
+                  </button>
+                </Tooltip>
+              </div>
+            )}
+            </div>
+          );
+        })()}
+
+        {/*
+         * Chat column. In "dual" it's a percentage-width docked column
+         * (no longer shrinks to an icon rail when History opens — History
+         * is an overlay in "dual", see below, so Chat always keeps its
+         * normal width); in "chat-full" it takes the entire surface;
+         * width animates to 0 (instead of unmounting) in "trial-full".
+         * New Search / Search History controls only appear in its header
+         * once Chat IS the main panel (chat-full) — while merely docked
+         * in "dual", History is already reachable from the Trial Panel's
+         * own header (shared `historyOpen` state), so repeating it here
+         * would be redundant. The fullscreen toggle itself is always
+         * rendered (even for bookmark-snapshot threads) but disabled when
+         * `lockDual`, for the same header-consistency reason as the
+         * Trial Panel's own (disabled) fullscreen button — see
+         * BookmarkSnapshotPanel.
          */}
         <div
-          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-            sidebarOpen ? "md:w-64 border-r" : "md:w-0 border-r-0"
-          }`}
+          className={`hidden md:flex md:flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+            showChat ? "border-l" : ""
+          } ${layoutMode === "dual" ? "md:shrink-0" : ""}`}
+          style={{
+            width: !showChat
+              ? "0%"
+              : layoutMode === "dual"
+              ? `${CHAT_PANEL_WIDTH_PERCENT}%`
+              : !isMobile && historyOpen
+              ? "calc(100% - 16rem)"
+              : "100%",
+          }}
         >
-          <div className="w-64 h-full flex flex-col p-4">
-            <div className="flex items-center justify-between mb-2 shrink-0">
-              <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                Chats
-              </span>
-              <Tooltip label="Collapse chat history">
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  aria-label="Collapse chat history"
-                  className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  <History className="w-4 h-4" strokeWidth={2} />
-                </button>
-              </Tooltip>
-            </div>
-            <div className="flex-1 min-h-0">
-              <ThreadListSidebar />
-            </div>
-          </div>
+              <div className="relative flex flex-1 min-h-0 flex-col">
+                <div className={`flex items-center justify-between mb-2 shrink-0 pt-4 ${PANEL_PADDING_X}`}>
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Chat
+                  </span>
+                  <div className="flex items-center gap-1">
+                    {isChatFullscreen && (
+                      <TrialPanelHeaderIcons
+                        isMobile={false}
+                        historyOpen={historyOpen}
+                        onToggleHistory={() => setHistoryOpen((v) => !v)}
+                      />
+                    )}
+                    <Tooltip label={lockDual ? "Fullscreen unavailable for bookmarked trials" : isChatFullscreen ? "Exit fullscreen" : "Fullscreen chat"}>
+                      <button
+                        onClick={lockDual ? undefined : () => setLayoutMode(isChatFullscreen ? "dual" : "chat-full")}
+                        disabled={lockDual}
+                        aria-label={isChatFullscreen ? "Exit fullscreen" : "Fullscreen chat"}
+                        className={`p-1.5 rounded-lg ${lockDual ? "text-slate-300 dark:text-slate-600 cursor-not-allowed" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                      >
+                        {isChatFullscreen ? <Minimize2 className="w-4 h-4" strokeWidth={2} /> : <Maximize2 className="w-4 h-4" strokeWidth={2} />}
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+                {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} />}
+                {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
+                  isScoped={!!scope}
+                  placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
+                  greeting={scope ? (scope.trialIds.length === 1 ? "Discuss this trial" : `Discuss these ${scope.trialIds.length} trials`) : greeting}
+                  prompts={scope ? [] : prompts}
+                  intakeData={intakeData}
+                />}
+              </div>
         </div>
 
-        {/* Mobile: drawer toggled by the shared floating trigger below */}
-        {isMobile && sidebarOpen && (
-          <div className="absolute inset-0 z-30 flex">
-            <div className="w-72 max-w-[80%] h-full bg-white dark:bg-[#181D26] p-4 flex flex-col border-r border-slate-200/70 dark:border-slate-700/60">
-              <div className="flex items-center justify-between mb-2 shrink-0">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  Chats
-                </span>
-                <Tooltip label="Close chat history">
-                  <button
-                    onClick={() => setSidebarOpen(false)}
-                    aria-label="Close chat history"
-                    className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  >
-                    <X className="w-4 h-4" strokeWidth={2} />
-                  </button>
-                </Tooltip>
-              </div>
-              <div
-                className="flex-1 min-h-0"
-                onClick={(e) => {
-                  // Auto-close the drawer after picking/creating a thread.
-                  if ((e.target as HTMLElement).closest("button")) {
-                    setSidebarOpen(false);
-                  }
-                }}
-              >
-                <ThreadListSidebar />
-              </div>
-            </div>
+        {/* Search History as a scrim+overlay — "dual" already has two
+         * panels sharing the row, so History floats above them instead of
+         * squeezing either one (squeeze is reserved for the fullscreen
+         * cases above, where there's only a single panel to share space
+         * with). Always mounted (never conditionally rendered) while in
+         * "dual" so open/close can transition smoothly — same convention
+         * as the inline-squeeze History column and the Chat/Trial Panel
+         * width transitions above — instead of popping in/out instantly.
+         * Clicking the scrim (or anywhere outside the drawer, since the
+         * scrim covers the rest of this row) closes it. */}
+        {!isMobile && layoutMode === "dual" && (
+          <div
+            className={`absolute inset-0 z-30 flex transition-opacity duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+              historyOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
             <div
-              className="flex-1 bg-black/30"
-              onClick={() => setSidebarOpen(false)}
-            />
+              className="w-64 h-full bg-white dark:bg-[#181D26] border-r border-slate-200/70 dark:border-slate-700/60 shadow-xl flex flex-col transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              style={{ transform: historyOpen ? "translateX(0)" : "translateX(-1rem)" }}
+            >
+              <SearchHistoryPanelContent onClose={() => setHistoryOpen(false)} />
+            </div>
+            <div className="flex-1 bg-black/20" onClick={() => setHistoryOpen(false)} />
           </div>
         )}
+      </div>
 
-        <div className="relative flex flex-1 min-w-0 flex-col">
-          {/*
-           * Shared floating controls — expand-sidebar + new-chat — shown
-           * whenever the sidebar is collapsed, on both desktop and mobile
-           * (previously this was mobile-only, leaving desktop users no way
-           * to reopen a fully-collapsed sidebar).
-           */}
-          {!sidebarOpen && (
-            <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-              <Tooltip label="Chat history">
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  aria-label="Open chat history"
-                  className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <History className="w-4 h-4" strokeWidth={2} />
-                </button>
-              </Tooltip>
-              <Tooltip label="New chat">
-                <ThreadListPrimitive.New asChild>
-                  <button
-                    aria-label="New chat"
-                    className="flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-700/60 shadow-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+        {/* Mobile: a single overlay sheet shared by Search History and
+         * Chat (same mutex as desktop — only one can be the active value
+         * of `mobileSheet`). */}
+        {isMobile && mobileSheet && (
+          <div className="absolute inset-0 z-30 flex justify-end">
+            <div
+              className="flex-1 bg-black/30"
+              onClick={() => setMobileSheet(null)}
+            />
+            <div
+              className="relative h-full bg-white dark:bg-[#181D26] border-l border-slate-200/70 dark:border-slate-700/60 flex flex-col"
+              style={{ width: mobileSheet === "history" ? "min(80%, 20rem)" : CHAT_PANEL_MOBILE_WIDTH }}
+            >
+              {mobileSheet === "history" && (
+                <>
+                  <div className={`flex items-center justify-between mb-2 pt-4 shrink-0 ${PANEL_PADDING_X}`}>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Search History
+                    </span>
+                    <Tooltip label="Close search history">
+                      <button
+                        onClick={() => setMobileSheet(null)}
+                        aria-label="Close search history"
+                        className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <X className="w-4 h-4" strokeWidth={2} />
+
+                      </button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-1 min-h-0 pb-4 ${PANEL_PADDING_X}`}
+                    onClick={(e) => {
+                      // Auto-close the sheet after picking/creating a thread.
+                      if ((e.target as HTMLElement).closest("button")) {
+                        setMobileSheet(null);
+                      }
+                    }}
                   >
-                    <Plus className="w-4 h-4" strokeWidth={2} />
-                  </button>
-                </ThreadListPrimitive.New>
-              </Tooltip>
-            </div>
-          )}
-          {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} bothPanelsOpen={sidebarOpen && trialPanelOpen} />}
-          {/*
-           * Desktop "Find matching trials" / "Screen a patient" CTA — the
-           * full labeled pill, centered independently of the right-side
-           * floating-controls row below (so it keeps its own definition
-           * of "centered" regardless of how wide that row gets).
-           */}
-          {!loading && !hydrationError && !scope && (
-            <div className="hidden md:flex absolute top-4 left-1/2 -translate-x-1/2 z-20">
-              <Tooltip label={isClinician ? "Screen a patient" : "Find matching trials"}>
-                <button
-                  onClick={openCtaModal}
-                  className="flex items-center justify-center gap-2 h-12 px-5 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
-                  aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
-                >
-                  <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
-                  <span className="font-semibold text-sm text-blue-600">
-                    {isClinician ? "Screen a patient" : "Find matching trials"}
-                  </span>
-                </button>
-              </Tooltip>
-            </div>
-          )}
-          {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
-            isScoped={!!scope}
-            placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
-            greeting={scope ? (scope.trialIds.length === 1 ? "Discuss this trial" : `Discuss these ${scope.trialIds.length} trials`) : greeting}
-            prompts={scope ? [] : prompts}
-            intakeData={intakeData}
-          />}
-          {/*
-           * Right-side floating-controls row — shares one flex container
-           * (fixed-width children, `gap-2`) instead of each button being
-           * independently `absolute`-positioned, which is what let the
-           * mobile CTA icon and the Trial Panel trigger's widening
-           * "Trials N" label collide before. Mobile-only CTA icon comes
-           * first (further from the edge), trigger/scope button last.
-           */}
-          {!loading && !hydrationError && (
-            <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-              {!scope && (
-                <Tooltip label={isClinician ? "Screen a patient" : "Find matching trials"}>
-                  <button
-                    onClick={openCtaModal}
-                    className="md:hidden flex items-center justify-center w-12 h-12 rounded-full bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-500/40 shadow-sm hover:shadow-md transition-shadow focus:outline-none select-none"
-                    aria-label={isClinician ? "Screen a patient for clinical trials" : "Find matching clinical trials"}
-                  >
-                    <Zap className="w-4 h-4 text-blue-600" strokeWidth={2} />
-                  </button>
-                </Tooltip>
+                    <ThreadListSidebar />
+                  </div>
+                </>
               )}
-              {scope ? (
-                !trialPanelOpen && (
-                  <Tooltip label="View this conversation's trials">
-                    <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-12 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
-                      <PanelRight className="h-4 w-4" />
-                      Trials {scope.trialIds.length}
-                    </button>
-                  </Tooltip>
-                )
-              ) : (
-                <TrialPanelTrigger />
+              {mobileSheet === "chat" && (
+                <div className="relative flex flex-1 min-h-0 flex-col">
+                  <div className={`flex items-center justify-between mb-2 pt-4 shrink-0 ${PANEL_PADDING_X}`}>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Chat
+                    </span>
+                    <Tooltip label="Close chat">
+                      <button
+                        onClick={() => setMobileSheet(null)}
+                        aria-label="Close chat"
+                        className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        <X className="w-4 h-4" strokeWidth={2} />
+                      </button>
+                    </Tooltip>
+                  </div>
+                  {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} />}
+                  {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}</div> : <ChatSurface
+                    isScoped={!!scope}
+                    placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
+                    greeting={scope ? (scope.trialIds.length === 1 ? "Discuss this trial" : `Discuss these ${scope.trialIds.length} trials`) : greeting}
+                    prompts={scope ? [] : prompts}
+                    intakeData={intakeData}
+                  />}
+                </div>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {!scope && showMatchModal && (
           <MatchProfileModal
             onConfirm={(_profile: MatchProfile, message: string) => {
               setShowMatchModal(false);
+              openChatForRun();
+              setAutoCloseChatPending(true);
               aui.thread.append(message);
             }}
             onClose={() => setShowMatchModal(false)}
@@ -632,41 +840,106 @@ function AssistantPanelBody({
             initialStep="prescreen"
             onConfirm={(message: string) => {
               setShowClinicianModal(false);
+              openChatForRun();
+              setAutoCloseChatPending(true);
               aui.thread.append(message);
             }}
             onClose={() => setShowClinicianModal(false)}
           />
         )}
 
-        {/*
-         * Right-side Trial Panel — persistent structured view of the
-         * active trial search (see contexts/TrialSearchContext.tsx). On
-         * desktop it docks alongside chat, animating width like the left
-         * sidebar; on mobile it becomes a full-height sheet so chat never
-         * has to share horizontal space with it.
-         */}
-        <div
-          className={`hidden md:flex md:shrink-0 flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-            trialPanelOpen ? "border-l" : "border-l-0"
-          }`}
-          style={{ width: trialPanelOpen ? `${TRIAL_PANEL_WIDTH_PERCENT}%` : 0 }}
-        >
-          {!isMobile && panel}
-        </div>
-
-        {isMobile && trialPanelOpen && (
-          <div className="absolute inset-0 z-30 flex justify-end">
-            <div className="flex-1 bg-black/30" onClick={closeTrialPanel} />
-            <div
-              className="h-full bg-white dark:bg-[#181D26] border-l border-slate-200/70 dark:border-slate-700/60"
-              style={{ width: TRIAL_PANEL_MOBILE_WIDTH }}
-            >
-              {panel}
-            </div>
-          </div>
-        )}
-
         {!loading && !hydrationError && !scope && <TrialSearchChatBridge />}
     </>
   );
 }
+
+/** Shared "Search History" header + list, used both as an inline column
+ * (desktop "dual" layout) and inside a floating overlay (desktop
+ * fullscreen layouts) — see AssistantPanelBody. */
+function SearchHistoryPanelContent({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="w-64 h-full flex flex-col pt-4 pb-5">
+      <div className={`flex items-center justify-between mb-2 shrink-0 ${PANEL_PADDING_X}`}>
+        <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+          Search History
+        </span>
+        <Tooltip label="Close search history">
+          <button
+            onClick={onClose}
+            aria-label="Close search history"
+            className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <PanelRightClose className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </Tooltip>
+      </div>
+      <div className={`flex-1 min-h-0 ${PANEL_PADDING_X}`}>
+        <ThreadListSidebar />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Plain-icon (no circular button background) header row for the Trial
+ * Panel: New Search (no open/close state, so no highlight) plus Search
+ * History, and — mobile only — Open Chat (desktop never needs a chat
+ * toggle here: Chat is either part of the default dual layout or reached
+ * via its own fullscreen toggle).
+ */
+function TrialPanelHeaderIcons({
+  isMobile,
+  historyOpen,
+  onToggleHistory,
+  chatOpen,
+  onToggleChat,
+}: {
+  isMobile: boolean;
+  historyOpen: boolean;
+  onToggleHistory: () => void;
+  /** Mobile-only: opens/closes the Chat overlay sheet. Omitted on desktop,
+   * where this icon row never renders a Chat toggle at all. */
+  chatOpen?: boolean;
+  onToggleChat?: () => void;
+}) {
+  const iconClass = (active: boolean) =>
+    `p-1.5 rounded-lg transition-colors ${
+      active
+        ? "bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400"
+        : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+    }`;
+  return (
+    <div className="flex items-center gap-0.5">
+      <Tooltip label="New search">
+        <ThreadListPrimitive.New asChild>
+          <button aria-label="New search" className={iconClass(false)}>
+            <Plus className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </ThreadListPrimitive.New>
+      </Tooltip>
+      <Tooltip label={historyOpen ? "Close search history" : "Search history"}>
+        <button
+          onClick={onToggleHistory}
+          aria-label="Search history"
+          aria-pressed={historyOpen}
+          className={iconClass(historyOpen)}
+        >
+          <History className="w-4 h-4" strokeWidth={2} />
+        </button>
+      </Tooltip>
+      {isMobile && (
+        <Tooltip label={chatOpen ? "Close chat" : "Open chat"}>
+          <button
+            onClick={onToggleChat}
+            aria-label="Open chat"
+            aria-pressed={chatOpen}
+            className={iconClass(!!chatOpen)}
+          >
+            <MessageSquareText className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </Tooltip>
+      )}
+    </div>
+  );
+}
+

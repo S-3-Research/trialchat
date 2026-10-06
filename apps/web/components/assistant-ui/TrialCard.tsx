@@ -40,6 +40,82 @@ function formatLocation(t: Trial): string | null {
   return [city, state].filter(Boolean).join(", ") || (loc.country ? toTitleCase(loc.country) : null);
 }
 
+/**
+ * Trial `eligibility_summary` is free text from the source API, but it
+ * reliably contains "Inclusion Criteria" / "Exclusion Criteria" (and "Key
+ * Inclusion/Exclusion Criteria") markers we can split on to render labeled
+ * sections instead of one dense, unformatted blob. Lines within a section
+ * that look like list items (leading "-", "*", bullet, or "1.") render as
+ * a real bulleted list; everything else stays as plain paragraphs.
+ */
+const CRITERIA_HEADING_RE = /^(key\s+)?(inclusion|exclusion)\s+criteria\s*:?$/i;
+const CRITERIA_INLINE_RE = /^\s*((?:key\s+)?(?:inclusion|exclusion)\s+criteria)\s*:?\s*(.*)$/i;
+const LIST_ITEM_RE = /^(?:[-*\u2022]|\d+[.)])\s+(.*)$/;
+
+type EligibilitySection = { heading: string | null; lines: string[] };
+
+function parseEligibilityText(text: string): EligibilitySection[] {
+  const rawLines = text
+    .split(/\r?\n/)
+    .flatMap((line) => {
+      // Some sources run headings inline with the following sentence
+      // ("Inclusion Criteria: Age 18+...") rather than on their own line.
+      const inline = line.match(CRITERIA_INLINE_RE);
+      if (inline) return inline[2] ? [inline[1], inline[2]] : [inline[1]];
+      return [line];
+    })
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const sections: EligibilitySection[] = [];
+  let current: EligibilitySection = { heading: null, lines: [] };
+  for (const line of rawLines) {
+    if (CRITERIA_HEADING_RE.test(line)) {
+      if (current.heading || current.lines.length) sections.push(current);
+      current = { heading: toTitleCase(line.replace(/:$/, "")), lines: [] };
+    } else {
+      current.lines.push(line);
+    }
+  }
+  if (current.heading || current.lines.length) sections.push(current);
+  return sections.length ? sections : [{ heading: null, lines: rawLines }];
+}
+
+function EligibilityText({ text }: { text: string }) {
+  const sections = parseEligibilityText(text);
+  return (
+    <div className="space-y-3">
+      {sections.map((section, i) => {
+        const isList = section.lines.some((line) => LIST_ITEM_RE.test(line));
+        return (
+          <div key={i}>
+            {section.heading && (
+              <h4 className="text-[0.75rem] font-bold text-slate-700 dark:text-slate-200 mb-1">
+                {section.heading}
+              </h4>
+            )}
+            {isList ? (
+              <ul className="list-disc pl-4 space-y-1">
+                {section.lines.map((line, j) => (
+                  <li key={j} className="leading-relaxed">
+                    {line.match(LIST_ITEM_RE)?.[1] ?? line}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              section.lines.map((line, j) => (
+                <p key={j} className="leading-relaxed">
+                  {line}
+                </p>
+              ))
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function MatchReports({ trial, asked }: { trial: Trial; asked?: boolean }) {
   if (!trial.reports?.length) return null;
   return (
@@ -132,7 +208,7 @@ export function TrialCard({
   const dimmed = locked && !asked;
   return (
     <div
-      className={`relative bg-gradient-to-b from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-[24px] border-1 p-1 mb-3 animate-trial-card-enter transition-[border-color,box-shadow] duration-300 ${
+      className={`relative bg-gradient-to-b from-white to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-[28px] border-1 p-1.5 mb-4 animate-trial-card-enter transition-[border-color,box-shadow] duration-300 ${
         dimmed ? "cursor-default" : "cursor-pointer"
       } ${
         asked
@@ -154,7 +230,7 @@ export function TrialCard({
         }`}
       />
       <div
-        className={`p-4 flex flex-col rounded-[20px] ${
+        className={`p-5 flex flex-col rounded-[24px] ${
           asked ? "bg-white dark:bg-slate-900/90 relative z-10" : ""
         }`}
       >
@@ -209,14 +285,14 @@ export function TrialCard({
 
         {/* Typography */}
         <h3
-          className={`text-[0.9375rem] font-bold leading-tight mb-1 line-clamp-2 ${
+          className={`text-[1.0625rem] font-bold leading-snug mb-1.5 line-clamp-3 ${
             asked ? "text-emerald-700 dark:text-emerald-400" : "text-slate-800 dark:text-white"
           }`}
         >
           {trial.title ?? "Untitled trial"}
         </h3>
         {trial.conditions?.length ? (
-          <p className="text-[0.8125rem] text-slate-500 dark:text-slate-400 mb-4 line-clamp-1">
+          <p className="text-[0.875rem] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
             {trial.conditions.join(", ")}
           </p>
         ) : (
@@ -255,9 +331,9 @@ export function TrialCard({
 
         <div className={`accordion-rows ${expanded ? "accordion-open" : "accordion-closed"}`}>
           <div>
-            <div className="mb-4 pt-3 border-t border-slate-200/70 dark:border-slate-700/70 text-xs text-slate-600 dark:text-slate-300 space-y-2">
+            <div className="mb-4 pt-3 border-t border-slate-200/70 dark:border-slate-700/70 text-[0.8125rem] text-slate-600 dark:text-slate-300 space-y-2">
               {trial.eligibility_summary && (
-                <p className="leading-relaxed">{trial.eligibility_summary}</p>
+                <EligibilityText text={trial.eligibility_summary} />
               )}
               {trial.links?.length ? (
                 <div className="flex flex-col gap-1">

@@ -113,7 +113,22 @@ export type TrialSearchState = {
   status: TrialSearchStatus;
   error?: string;
   updatedAt?: string;
+  /**
+   * Fired alongside a successful `source: "panel"` refine/sort/page (never
+   * a brand-new search, never a Chat-driven one) — purely a transient UI
+   * signal for TrialPanel.tsx to show a short-lived "Filters updated" /
+   * "N results" badge next to the Panel header (see
+   * components/ui/TransientBadge.tsx + hooks/useTransientToast.ts). A
+   * fresh object identity each time (not just a boolean) is what lets a
+   * consumer's `useEffect` re-fire even if the same kind of change
+   * happens twice in a row. Deliberately excluded from
+   * `PersistedTrialSearch` below — restoring a thread should never
+   * resurface a stale "updated!" toast from a previous session.
+   */
+  lastChangeEvent?: { id: string; source: TrialSearchSource; kind: "new" | "refine" | "sort" | "page" };
 };
+
+export type TrialSearchSource = "chat" | "panel";
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_SELECTED_TRIALS = 5;

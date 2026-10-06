@@ -1,39 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import {
   PanelRight,
   Loader2,
   Pencil,
+  X,
 } from "lucide-react";
 import { useTrialSearch } from "@/contexts/TrialSearchContext";
 import type { TrialSearchState } from "@/lib/types/trialSearch";
 import { TrialPanelShell, PANEL_PADDING_X } from "./TrialPanelShell";
 import { TrialCard, toTitleCase } from "./TrialCard";
-import { TrialSearchModal } from "@/components/assistant-ui/TrialSearchModal";
+import { TrialSearchStartForm } from "./TrialSearchStartForm";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { TransientBadge } from "@/components/ui/TransientBadge";
 
 /**
- * Trial Panel's width as a percentage of the overall chat+panel container
- * (see AssistantPanel.tsx, which owns the actual `width` styling for both
- * the desktop docked column and the mobile sheet) rather than a fixed
- * rem value, so "make the panel bigger" is a single-constant change and
- * both layouts stay in sync.
- */
-export const TRIAL_PANEL_WIDTH_PERCENT = 38;
-
-/**
- * Width used for the Trial Panel's mobile/"overlay" full-height sheet
- * (see AssistantPanel.tsx's `isMobile && trialPanelOpen` block) — this is
- * intentionally a SEPARATE constant from `TRIAL_PANEL_WIDTH_PERCENT`
- * rather than reusing it, since `min(${TRIAL_PANEL_WIDTH_PERCENT}%, 92%)`
- * previously meant "38% of a narrow phone viewport", i.e. a tiny sheet.
- * On mobile the panel isn't sharing width with chat (it overlays on top
- * instead), so it should read as "almost full width", capped so it
- * doesn't get absurdly wide on a tablet-sized "overlay" viewport.
- */
-export const TRIAL_PANEL_MOBILE_WIDTH = "min(92%, 30rem)";
+ * Trial Panel is now the persistent, always-docked main surface (chat is
+ * the secondary, collapsible column — see AssistantPanel.tsx, which owns
+ * the chat column's width constants). It always takes the remaining flex
+ * space, so there are no width constants to export here anymore.
 
 /**
  * Single source of truth for the panel's horizontal padding (header,
@@ -86,13 +73,11 @@ function buildCriteriaChips(search: TrialSearchState): string[] {
   return chips;
 }
 
-function CriteriaRow() {
+function CriteriaRow({ onEdit, onCancel, editing }: { onEdit: () => void; onCancel: () => void; editing: boolean }) {
   const { search } = useTrialSearch();
-  const [modalOpen, setModalOpen] = useState(false);
   const chips = buildCriteriaChips(search);
   const visible = chips.slice(0, MAX_VISIBLE_CHIPS);
   const overflow = chips.slice(MAX_VISIBLE_CHIPS);
-  const modalMode = search.status === "idle" ? "new" : "refine";
   // Edited filters call the trial-search API directly and save straight
   // into the thread's checkpoint (contexts/TrialSearchContext.tsx), which
   // conflicts with a chat run holding the same checkpoint locked — the
@@ -105,8 +90,12 @@ function CriteriaRow() {
     <>
       {/*
        * Two-column layout — chip column wraps freely on its own, "Edit
-       * filters" sits in a fixed right column, so a long/wrapping set of
-       * criteria chips never pushes or reflows the button's position.
+       * filters"/"Cancel" sits in a fixed right column, so a long/wrapping
+       * set of criteria chips never pushes or reflows the button's
+       * position. While editing, this same slot swaps to a "Cancel" link
+       * (same style/position) rather than the form's own Apply button row
+       * growing a second pinned-to-the-bottom button — keeps the control
+       * that opened edit mode as the one place to back out of it too.
        */}
       <div className="grid grid-cols-[1fr_auto] items-start gap-2 mt-1">
         <div className="flex items-center flex-wrap gap-1.5 min-w-0">
@@ -128,20 +117,28 @@ function CriteriaRow() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          disabled={isRunning}
-          title={isRunning ? "Wait for the current chat response to finish" : undefined}
-          className="shrink-0 flex items-center pt-1 gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
-        >
-          <Pencil className="w-3 h-3" strokeWidth={2} />
-          Edit filters
-        </button>
+        {editing ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="shrink-0 flex items-center pr-2 pt-1 gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            <X className="w-3 h-3" strokeWidth={2} />
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={isRunning}
+            title={isRunning ? "Wait for the current chat response to finish" : undefined}
+            className="shrink-0 flex items-center pr-2 pt-1 gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:no-underline"
+          >
+            <Pencil className="w-3 h-3" strokeWidth={2} />
+            Edit filters
+          </button>
+        )}
       </div>
-      {modalOpen && (
-        <TrialSearchModal mode={modalMode} onClose={() => setModalOpen(false)} />
-      )}
     </>
   );
 }
@@ -197,7 +194,7 @@ function EmptyState() {
  */
 function TrialPanelSkeleton() {
   return (
-    <div className="w-full h-full flex flex-col pt-5 pb-5 min-w-0">
+    <div className="w-full h-full flex flex-col pt-4 pb-5 min-w-0">
       <div className={`flex items-center justify-between mb-2 shrink-0 ${PANEL_PADDING_X}`}>
         <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
           Trial Panel
@@ -218,18 +215,18 @@ function TrialPanelSkeleton() {
   );
 }
 
-export function TrialPanel() {
+export function TrialPanel({ onAsk, headerActions, isFullscreen, onToggleFullscreen }: { onAsk?: (question: string) => void; headerActions?: ReactNode; isFullscreen?: boolean; onToggleFullscreen?: () => void }) {
   const aui = useAui();
   const remoteId = useAuiState((s) => s.optional.threadListItem?.remoteId);
   const {
     search,
-    panelOpen,
     isHydrating,
-    closePanel,
     loadNextTrialSearchPage,
     toggleTrialSelection,
     markTrialAsked,
     clearAskedTrials,
+    panelToast,
+    showPanelToast,
   } = useTrialSearch();
 
   // Single subscription for the whole panel (not one per card) — the
@@ -248,31 +245,101 @@ export function TrialPanel() {
     wasRunningRef.current = isRunning;
   }, [isRunning, clearAskedTrials]);
 
-  if (!panelOpen) return null;
+  // Edit-filters re-uses the same start form used for brand-new searches,
+  // pre-filled with the active criteria, in place of the trial list — see
+  // TrialSearchStartForm.tsx's `mode` prop.
+  const [editingFilters, setEditingFilters] = useState(false);
+
+  // Short-lived "Filters updated" confirmation next to the header — fires
+  // off `search.lastChangeEvent` (set only for a successful Panel-sourced
+  // refine/page, never a brand-new search or a Chat-sourced one; see
+  // TrialSearchContext.tsx's `runSearch`). Keyed by `lastChangeEvent.id` so
+  // this effect only re-fires on an actual new event, not every render.
+  // Shares its toast state with bookmark/unbookmark confirmations (see
+  // `panelToast`'s doc comment on TrialSearchApi) so both land in this
+  // same header slot instead of the bookmark one floating next to
+  // whichever card/button triggered it.
+  const toast = panelToast;
+  const show = showPanelToast;
+  const lastShownChangeIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const event = search.lastChangeEvent;
+    if (!event || event.id === lastShownChangeIdRef.current) return;
+    lastShownChangeIdRef.current = event.id;
+    show(
+      event.kind === "page"
+        ? `${search.pagination.total} trials shown`
+        : `Filters updated \u00b7 ${search.pagination.total} match${search.pagination.total === 1 ? "" : "es"}`
+    );
+  }, [search.lastChangeEvent, search.pagination.total, show]);
 
   // Keep the previous thread's cards hidden while fetching this checkpoint.
   if (isHydrating) return <TrialPanelSkeleton />;
 
   const { results, pagination, status } = search;
 
+  // TrialSearchStartForm manages its own internal scroll region (so its
+  // CTA footer can stay pinned outside of it) — whenever it's the thing
+  // being rendered (brand-new idle search, or refine/edit-filters mode),
+  // tell the shell to skip its own scroll container/fade so the two
+  // don't nest and double up the fade band at the shared edge.
+  const showingStartForm = status === "idle" || editingFilters;
+
   return (
-    <TrialPanelShell title="Trial Panel" count={pagination.total} onClose={closePanel} description={<CriteriaRow />}>
+    <TrialPanelShell title="Trial Panel" count={pagination.total} isFullscreen={isFullscreen} onToggleFullscreen={onToggleFullscreen} headerActions={headerActions} statusBadge={<TransientBadge toast={toast} />} description={status !== "idle" ? <CriteriaRow onEdit={() => setEditingFilters(true)} onCancel={() => setEditingFilters(false)} editing={editingFilters} /> : undefined} selfScrollingBody={showingStartForm}>
+          {/*
+           * Both TrialSearchStartForm usages below explicitly give it a
+           * `h-full` wrapper — the form's own root uses `h-full flex
+           * flex-col` internally to pin its CTA button to the bottom
+           * (scrolling only the filter fields above it), which only
+           * resolves correctly if its *immediate* parent has a definite
+           * height. Without this, the button doesn't truly stay pinned —
+           * it just happens to look fixed whenever the content is short
+           * enough to not need scrolling in the first place (e.g. a
+           * brand-new idle search with no criteria chips row above
+           * eating space), and visibly fails once content needs to
+           * scroll (e.g. refine/edit-filters mode).
+           */}
           {status === "idle" && (
-            <div className="text-sm text-slate-500 dark:text-slate-400">
-              No active trial search yet. Ask about a condition in chat, or
-              use &quot;Edit filters&quot; above, to get started.
+            <div
+              className={`h-full ${isRunning ? "opacity-40 pointer-events-none transition-opacity" : "transition-opacity"}`}
+              aria-busy={isRunning}
+            >
+              <TrialSearchStartForm onSubmitted={() => onAsk?.("")} />
             </div>
           )}
 
-          {status === "error" && (
+          {status !== "idle" && editingFilters && (
+            <div className="h-full">
+              <TrialSearchStartForm
+                mode="refine"
+                initialCriteria={search.criteria}
+                initialSort={search.sort}
+                onSubmitted={() => {
+                  // Optimistic nudge: `lastChangeEvent` (and therefore the
+                  // real "Filters updated" confirmation) only lands after
+                  // the refine request's full round-trip resolves, which
+                  // made the badge feel sluggish to appear. Showing this
+                  // "Updating…" state the instant the user submits closes
+                  // that gap — the success effect below overwrites it with
+                  // the real message once results land.
+                  show("Updating filters…", "info");
+                  setEditingFilters(false);
+                }}
+                onCancel={() => setEditingFilters(false)}
+              />
+            </div>
+          )}
+
+          {!editingFilters && status === "error" && (
             <div className="text-sm text-red-600 dark:text-red-400 mb-2">
               {search.error ?? "Something went wrong."}
             </div>
           )}
 
-          {results.length === 0 && status === "success" && <EmptyState />}
+          {!editingFilters && results.length === 0 && status === "success" && <EmptyState />}
 
-          {results.map((trial, i) => (
+          {!editingFilters && results.map((trial, i) => (
             <TrialCard
               key={trial.id ?? i}
               trial={trial}
@@ -282,13 +349,22 @@ export function TrialPanel() {
               locked={isRunning}
               onToggleSelect={() => trial.id && toggleTrialSelection(trial.id)}
               onAsked={() => trial.id && markTrialAsked(trial.id)}
-              onAsk={(question) => aui.thread.append(question)}
+              onAsk={(question) => {
+                // Lets the parent (AssistantPanel.tsx) expand the
+                // collapsed chat column so the user actually sees the
+                // streamed answer, instead of it arriving behind a
+                // closed panel — falls back to appending directly if no
+                // `onAsk` override was supplied (e.g. bookmark snapshot
+                // callers that don't need this).
+                onAsk?.(question);
+                aui.thread.append(question);
+              }}
               sourceThreadId={remoteId}
               sourceSearchId={search.id}
             />
           ))}
 
-          {(status === "searching" && results.length === 0) && (
+          {!editingFilters && status === "searching" && results.length === 0 && (
             <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 py-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2} />
               Updating results…
@@ -303,7 +379,7 @@ export function TrialPanel() {
            * either the button (more pages left) or the "X of Y shown"
            * summary (no pages left) once it resolves.
            */}
-          {results.length > 0 && (status === "success" || status === "loading-more") && (
+          {!editingFilters && results.length > 0 && (status === "success" || status === "loading-more") && (
             <div className="flex justify-center pt-1 pb-3">
               {status === "loading-more" ? (
                 <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 py-2">
@@ -313,7 +389,14 @@ export function TrialPanel() {
               ) : pagination.hasNextPage ? (
                 <button
                   type="button"
-                  onClick={() => loadNextTrialSearchPage()}
+                  onClick={() => {
+                    // Same optimistic-toast rationale as the refine
+                    // submit handler above — don't make the user wait
+                    // for the next page's round-trip before the panel
+                    // acknowledges the click.
+                    show("Loading more…", "info");
+                    loadNextTrialSearchPage();
+                  }}
                   className="text-xs font-semibold px-4 py-2 rounded-full border border-slate-200/80 dark:border-slate-700/70 bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 shadow-[0_12px_32px_-8px_rgba(30,41,59,0.12)] dark:shadow-[0_12px_32px_-8px_rgba(0,0,0,0.4)] hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   Load more
@@ -338,6 +421,10 @@ export function TrialPanel() {
  * AssistantPanelBody in AssistantPanel.tsx), so a widening "Trials N"
  * label here can never overlap a sibling with its own independent
  * absolute position.
+ *
+ * Unused now that the Trial Panel is the persistent main surface (it's
+ * never collapsed), but kept around (not wired into the layout) in case a
+ * future compact/mobile treatment wants it back.
  */
 export function TrialPanelTrigger() {
   const { panelOpen, openPanel, search } = useTrialSearch();

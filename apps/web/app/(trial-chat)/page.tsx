@@ -332,7 +332,7 @@ export default function Home() {
                         {/* CTA Button Area */}
                         <div className="relative z-10 flex flex-col gap-3">
                             {/* Button 1: Learn about Alzheimer's disease — black CTA, goes to chat with intake form shown (if not already seen) */}
-                            <Link href="/chat?skip_intake=0&open_match=0" className="w-full block group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-200 to-slate-400 p-[1px] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900">
+                            <Link href="/chat?skip_intake=0&open_match=0&open_chat=1" className="w-full block group/btn relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-200 to-slate-400 p-[1px] focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900">
                                 <div className="relative h-full w-full rounded-xl bg-slate-900 px-6 py-4 transition-all group-hover/btn:bg-slate-800">
                                     <div className="flex items-center justify-between">
                                         <span className="font-semibold text-slate-200 group-hover/btn:text-white transition-colors">Learn about Alzheimer&apos;s disease</span>

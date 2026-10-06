@@ -21,6 +21,7 @@ import {
   type Trial,
   type TrialSearchCriteria,
   type TrialSearchSort,
+  type TrialSearchSource,
   type TrialSearchState,
 } from "@/lib/types/trialSearch";
 
@@ -40,8 +41,7 @@ import {
  */
 
 import { LatestThreadSaveQueue } from "@/lib/latestThreadSaveQueue";
-
-type TrialSearchSource = "chat" | "panel";
+import { useTransientToast, type TransientToastState, type TransientToastVariant } from "@/hooks/useTransientToast";
 
 export type TrialPersistenceStatus = "idle" | "saving" | "saved" | "error";
 
@@ -121,6 +121,18 @@ type TrialSearchApi = {
       page?: number;
     }
   ) => void;
+  /**
+   * Shared short-lived confirmation pill shown next to the Trial Panel's
+   * title (see TrialPanelShell's `statusBadge` prop) — used for BOTH the
+   * "Filters updated" message (TrialPanel.tsx) and bookmark/unbookmark
+   * confirmations (BookmarkButton.tsx), so both land in the same spot
+   * instead of the bookmark one floating next to whichever card/button
+   * triggered it. One shared instance (not two independent toasts) means
+   * a bookmark toggle right after a filter change correctly replaces it
+   * rather than the two fighting over the same header slot.
+   */
+  panelToast: TransientToastState;
+  showPanelToast: (message: string, variant?: TransientToastVariant) => void;
 };
 
 const TrialSearchContext = createContext<TrialSearchApi | null>(null);
@@ -196,6 +208,10 @@ export function TrialSearchProvider({
   const userClosedPanelRef = useRef(false);
   const [persistenceStatus, setPersistenceStatus] =
     useState<TrialPersistenceStatus>("idle");
+
+  // Shared with BookmarkButton.tsx via `showPanelToast` — see `panelToast`'s
+  // doc comment on TrialSearchApi above.
+  const { toast: panelToast, show: showPanelToast } = useTransientToast();
 
   // Search history (spec section 17): snapshots of past *active* searches,
   // pushed only on true new-search transitions (never on refine/paginate/
@@ -288,6 +304,15 @@ export function TrialSearchProvider({
           status: "success",
           error: undefined,
           updatedAt: new Date().toISOString(),
+          // Only a Panel-sourced change the user can actually perceive as
+          // "I changed something, did it work?" gets a toast — a brand-new
+          // search already has its own obvious feedback (the whole list
+          // appearing), and Chat-sourced changes are narrated in the chat
+          // reply itself, so neither needs this extra nudge.
+          lastChangeEvent:
+            opts.source === "panel" && !opts.isNewSearch
+              ? { id: createSearchId(), source: opts.source, kind: opts.append ? "page" : "refine" }
+              : prev.lastChangeEvent,
         }));
 
         // Panel open/close rules (see spec section 8): auto-open on first
@@ -582,6 +607,8 @@ export function TrialSearchProvider({
       markTrialAsked,
       clearAskedTrials,
       ingestChatToolResult,
+      panelToast,
+      showPanelToast,
     }),
     [
       search,
@@ -601,6 +628,8 @@ export function TrialSearchProvider({
       markTrialAsked,
       clearAskedTrials,
       ingestChatToolResult,
+      panelToast,
+      showPanelToast,
     ]
   );
 
@@ -617,4 +646,16 @@ export function useTrialSearch(): TrialSearchApi {
     throw new Error("useTrialSearch must be used within a TrialSearchProvider");
   }
   return ctx;
+}
+
+/**
+ * Like `useTrialSearch`, but returns `undefined` instead of throwing when
+ * rendered outside a `TrialSearchProvider` — for consumers that work both
+ * inside the Trial Panel (where the Provider always wraps them) and in a
+ * standalone context that doesn't set one up, e.g. the `/bookmarks` page's
+ * own trial grid (see BookmarkButton.tsx, which uses this to fall back to
+ * its own local toast when there's no shared Panel header to show it in).
+ */
+export function useTrialSearchOptional(): TrialSearchApi | undefined {
+  return useContext(TrialSearchContext) ?? undefined;
 }

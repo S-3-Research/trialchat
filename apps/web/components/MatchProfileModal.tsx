@@ -70,7 +70,12 @@ export function MatchProfileModal({ onConfirm, onClose }: MatchProfileModalProps
     }
 
     const genderLabel = GENDER_OPTIONS.find((g) => g.value === gender)?.label ?? gender;
-    const message = `I am a ${age}-year-old ${genderLabel.toLowerCase()}, living in ZIP code ${zipcode.trim()}. Please help me find matching clinical trials.`;
+    // Names a concrete condition (this app's domain — ADRD) and uses an
+    // explicit imperative ("search now") rather than a vague "help me find"
+    // — both nudge the intention classifier toward "trial_matching" and
+    // give the agent enough to call `trial_search` immediately instead of
+    // asking a follow-up question first.
+    const message = `I am a ${age}-year-old ${genderLabel.toLowerCase()} living in ZIP code ${zipcode.trim()}, looking for clinical trials for Alzheimer's disease or related dementias (ADRD). Please search for matching trials now.`;
 
     onConfirm(profile, message);
   };

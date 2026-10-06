@@ -1,16 +1,17 @@
 "use client";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { ThreadContextScope } from "@/lib/bookmarks";
 import { TrialCard } from "@/components/assistant-ui/TrialCard";
 import { TrialPanelShell } from "@/components/assistant-ui/TrialPanelShell";
 
 export type TrialSnapshot = Exclude<ThreadContextScope, { type: "trial_search" }>;
 
-export function BookmarkSnapshotPanel({ scope, onClose }: { scope: TrialSnapshot; onClose: () => void }) {
+export function BookmarkSnapshotPanel({ scope, headerActions }: { scope: TrialSnapshot; onClose?: () => void; headerActions?: ReactNode }) {
   const trialsById = new Map(scope.trials.map((t) => [t.id, t]));
   const [focusedId, setFocusedId] = useState<string>();
   const date = new Date(scope.capturedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  return <TrialPanelShell title={scope.type === "bookmark_full_snapshot" ? "Bookmarked Trials" : "Selected Trials"} count={scope.trialIds.length} onClose={onClose} description={<div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+  return <TrialPanelShell title={scope.type === "bookmark_full_snapshot" ? "Bookmarked Trials" : "Selected Trials"} count={scope.trialIds.length} fullscreenDisabled headerActions={headerActions} description={<div className="space-y-1 text-xs text-slate-500 dark:text-slate-400">
     <p>{scope.trialIds.length} {scope.trialIds.length === 1 ? "trial" : "trials"} in this conversation</p>
     <p>Snapshot from {date}</p>
     <p>These are the trials included when this conversation started.</p>

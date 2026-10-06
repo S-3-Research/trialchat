@@ -1,6 +1,7 @@
 "use client";
 
 import type { FC, ComponentProps } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ThreadPrimitive,
   ComposerPrimitive,
@@ -8,6 +9,7 @@ import {
   ActionBarPrimitive,
   AuiIf,
   groupPartByType,
+  useAuiState,
 } from "@assistant-ui/react";
 import {
   ArrowUp,
@@ -39,6 +41,84 @@ import { Tooltip } from "@/components/ui/Tooltip";
  */
 const CONTENT_MAX_WIDTH = "max-w-[52rem]";
 
+/**
+ * Chat-side half of "Plan A" (the Trial-Panel header badge, in
+ * TrialPanel.tsx, is the other half): a quiet, self-dismissing
+ * acknowledgement of a Panel-sourced filter/sort/page change, rendered
+ * directly in the message column instead of only in the (possibly
+ * collapsed, or off-screen on mobile) Panel header. Mirrors
+ * TrialPanel.tsx's own `lastChangeEvent`-watching effect — see that
+ * file's comment for why only Panel-sourced refine/page actions (never a
+ * brand-new search or a Chat-sourced one) get this nudge.
+ */
+/**
+ * Plan A's chat-side half: a permanent (not fading) log of Panel-sourced * filter/sort/page changes, rendered as plain divider lines interleaved
+ * into the chat column — one per `search.lastChangeEvent` (see
+ * TrialSearchContext.tsx's `runSearch`). Deliberately NOT persisted into
+ * the LangGraph thread (no LLM round-trip, no transcript entry — these
+ * never touch the backend) and NOT saved into `PersistedTrialSearch`, so
+ * the log resets on a thread switch/reload the same way Trial Panel's own
+ * open/closed state does.
+ *
+ * Rendered as a single trailing block AFTER `ThreadPrimitive.Messages`
+ * (true chronological interleaving isn't possible for a client-only,
+ * non-persisted event), so without pruning it would stay visually
+ * "pinned" below the message list forever — including once new messages
+ * get appended ABOVE it after a send, making it look stuck/stale rather
+ * than tied to the filter action that just happened. To avoid that, each
+ * recorded event remembers how many messages existed when it fired; once
+ * `messages.length` grows past that snapshot (i.e. the user has sent/
+ * received anything since), the event is dropped instead of lingering.
+ */
+const TrialPanelChangeNotice: FC<{ messageCount: number }> = ({ messageCount }) => {
+  const { search } = useTrialSearch();
+  const [events, setEvents] = useState<{ id: string; message: string; messageCount: number }[]>([]);
+  const lastSearchIdRef = useRef<string | undefined>(undefined);
+  const lastShownChangeIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    // A new search (brand-new topic, or a different thread's search
+    // hydrated in) gets a fresh `search.id` — the prior search's change
+    // log no longer applies, so clear it rather than carrying stale
+    // "Filters updated" lines into an unrelated search's messages.
+    if (search.id !== lastSearchIdRef.current) {
+      lastSearchIdRef.current = search.id;
+      lastShownChangeIdRef.current = undefined;
+      setEvents([]);
+      return;
+    }
+    const event = search.lastChangeEvent;
+    if (!event || event.id === lastShownChangeIdRef.current) return;
+    lastShownChangeIdRef.current = event.id;
+    const message =
+      event.kind === "page"
+        ? `${search.pagination.total} trials shown`
+        : `Filters updated \u00b7 ${search.pagination.total} match${search.pagination.total === 1 ? "" : "es"}`;
+    setEvents((prev) => [...prev, { id: event.id, message, messageCount }]);
+  }, [search.id, search.lastChangeEvent, search.pagination.total, messageCount]);
+  // Drop any event recorded against an older (smaller) message count —
+  // a new message has been appended above it since, so it no longer
+  // reads as "just happened" and would otherwise stay stuck looking
+  // pinned beneath the growing conversation instead.
+  useEffect(() => {
+    setEvents((prev) => {
+      const next = prev.filter((e) => e.messageCount >= messageCount);
+      return next.length === prev.length ? prev : next;
+    });
+  }, [messageCount]);
+  if (events.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1">
+      {events.map((e) => (
+        <div key={e.id} className="flex items-center gap-3 py-1 text-xs text-slate-400 dark:text-slate-500">
+          <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+          <span className="shrink-0 font-medium text-slate-500 dark:text-slate-400">{e.message}</span>
+          <span className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export const Thread: FC<{
   placeholder: string;
   greeting: string;
@@ -50,10 +130,14 @@ export const Thread: FC<{
   // (bookmark-snapshot / scoped conversations). Shrink both so scoped
   // threads don't lose their first messages to an unnecessary fade.
   const topInset = isScoped ? "1rem" : "4.5rem";
+  // Drives TrialPanelChangeNotice's pruning (see that component's doc
+  // comment) — needs the live message count to detect "a new message
+  // has been appended since this notice fired".
+  const messageCount = useAuiState((s) => s.thread.messages.length);
   return (
     <ThreadPrimitive.Root className="flex flex-col h-full w-full bg-transparent">
       <ThreadPrimitive.Viewport
-        className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-10 pb-4 pt-8 ${isScoped ? "mt-2" : "mt-14"} flex flex-col`}
+        className={`flex-1 min-h-0 overflow-y-auto custom-scrollbar px-6 sm:px-10 pb-4 pt-8 ${isScoped ? "mt-2" : "mt-0"} flex flex-col`}
         style={{
           maskImage: `linear-gradient(to bottom, transparent, black ${topInset}, black calc(100% - 2rem), transparent 100%)`,
           WebkitMaskImage: `linear-gradient(to bottom, transparent, black ${topInset}, black calc(100% - 2rem), transparent 100%)`,
@@ -70,6 +154,21 @@ export const Thread: FC<{
               AssistantMessage,
             }}
           />
+          {/*
+           * Plan A's chat-side half: a Panel-sourced filter/sort/page
+           * change (see `search.lastChangeEvent`, set by
+           * TrialSearchContext.tsx's `runSearch`) is a side effect of
+           * something the user did in the Trial Panel, not a chat
+           * message — so it's never persisted into the LangGraph thread
+           * (no LLM round-trip, no transcript entry). But it still
+           * deserves a quiet, in-context acknowledgement in the column
+           * the user is actually looking at, not just the Panel header
+           * badge. Rendered as the newest/last item in the message
+           * flow (true timestamp-interleaving with real messages isn't
+           * possible for a client-only, non-persisted event) and fades
+           * out the same way the Panel's own badge does.
+           */}
+          <TrialPanelChangeNotice messageCount={messageCount} />
           {/*
            * Thread-scoped (not message-scoped) indicator covering the gap
            * between the user sending a message and any assistant message
@@ -294,7 +393,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
         <ComposerPrimitive.Input
           placeholder={scopedTrials.length > 0 ? "Ask about this trial..." : placeholder}
           rows={1}
-          className="flex-1 resize-none bg-transparent outline-none text-[15px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 max-h-40 px-2 py-2"
+          className="flex-1 resize-none bg-transparent outline-none text-[15px] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 max-h-40 px-2 py-2 sidebar-scrollbar"
         />
         {/* Native assistant-ui dictation — enabled whenever the runtime has a
             DictationAdapter configured (see lib/voiceDictationAdapters.ts).
