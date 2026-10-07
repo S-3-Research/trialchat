@@ -16,7 +16,8 @@ const nextConfig: NextConfig = {
       { source: "/trial-chat", destination: "/", permanent: true },
       { source: "/trial-chat/chat-v2", destination: "/chat", permanent: true },
       { source: "/chat-v2", destination: "/chat", permanent: true },
-      ...["chat", "settings", "bookmarks", "personalization", "docs", "updates", "admin", "voice-test"].map((page) => ({
+      { source: "/docs", destination: "/faq", permanent: true },
+      ...["chat", "settings", "bookmarks", "personalization", "faq", "updates", "admin", "voice-test"].map((page) => ({
         source: `/trial-chat/${page}`,
         destination: `/${page}`,
         permanent: true,

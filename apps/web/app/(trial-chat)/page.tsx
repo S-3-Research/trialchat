@@ -200,8 +200,7 @@ export default function Home() {
 
                 {/* Simple Menu */}
                 <div className={`hidden md:flex items-center gap-6 text-sm font-medium transition-colors duration-300 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                    <span className={`nav-link transition-colors cursor-pointer ${isLight ? 'hover:text-slate-900' : 'hover:text-white'}`}>Why TrialChat</span>
-                    <span className={`nav-link transition-colors cursor-pointer ${isLight ? 'hover:text-slate-900' : 'hover:text-white'}`}>How it Works</span>
+                    <Link href="/faq" className={`nav-link transition-colors cursor-pointer ${isLight ? 'hover:text-slate-900' : 'hover:text-white'}`}>How it Works</Link>
 
                     {/* Icon + Updates buttons group */}
                     <div className="flex items-center gap-2">
@@ -270,8 +269,7 @@ export default function Home() {
                 {/* Mobile Menu Overlay */}
                  {isMobileMenuOpen && (
                     <div className="fixed inset-0 z-40 bg-slate-950/95 backdrop-blur-xl md:hidden flex flex-col items-center justify-center space-y-8 animate-custom-fade-in-up">
-                        <span className="text-2xl font-light text-slate-300 hover:text-white cursor-pointer">Why TrialChat</span>
-                        <span className="text-2xl font-light text-slate-300 hover:text-white cursor-pointer">How it Works</span>
+                        <Link href="/faq" className="text-2xl font-light text-slate-300 hover:text-white cursor-pointer">How it Works</Link>
                         <Link href="/updates" className="text-2xl font-bold text-white flex items-center gap-3">
                             Updates
                         </Link>
@@ -312,7 +310,7 @@ export default function Home() {
                 </div>
 
                 {/* Right Side: The Glass "Interface" Card */}
-                <div className="w-full md:w-[420px] lg:w-[480px] animate-custom-fade-in-up" style={{ animationDelay: '0.5s' }}>
+                <div className="w-full md:w-[420px] lg:w-[480px] md:pb-18 self-end animate-custom-fade-in-up" style={{ animationDelay: '0.5s' }}>
 
                 {/* Card with hover lift */}
                 <div className="rounded-3xl overflow-hidden transition-transform duration-300 hover:scale-[1.02] hover:-translate-y-1">
