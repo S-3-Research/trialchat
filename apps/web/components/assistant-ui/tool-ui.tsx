@@ -11,9 +11,6 @@ import {
   Search,
   AlertCircle,
   Sparkles,
-  Loader2,
-  Check,
-  X,
   BookOpen,
 } from "lucide-react";
 import {

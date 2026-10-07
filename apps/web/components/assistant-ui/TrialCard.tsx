@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { MapPin, Check, X as XIcon, ChevronRight, ExternalLink, MessageCircle, Cake, FileText, ClipboardList, ChevronDown } from "lucide-react";
+import { MapPin, Check, X as XIcon, ExternalLink, MessageCircle, Cake, FileText, ClipboardList, ChevronDown } from "lucide-react";
 import type { Trial } from "@/lib/types/trialSearch";
 import { BookmarkButton } from "@/components/bookmarks/BookmarkButton";
 import { useBookmarks } from "@/hooks/useBookmarks";

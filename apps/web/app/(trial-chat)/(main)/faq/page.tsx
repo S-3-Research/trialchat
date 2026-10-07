@@ -144,7 +144,7 @@ export default function FaqPage() {
             Frequently Asked Questions
           </h1>
           <p className="text-lg text-slate-600 dark:text-slate-300">
-            Answers to common questions about Alzheimer's disease and participating in research studies
+            Answers to common questions about Alzheimer&apos;s disease and participating in research studies
           </p>
         </div>
 

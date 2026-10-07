@@ -92,6 +92,7 @@ export function SwapLabel({
     const observer = new ResizeObserver(measure);
     observer.observe(target);
     return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   return (
