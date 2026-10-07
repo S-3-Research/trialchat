@@ -113,7 +113,22 @@ export function createAgentNode(config: AgentNodeConfig) {
         content:
           "User context (collected once via a short intake form; treat as a soft preference, not a hard constraint):\n" +
           JSON.stringify(state.userContext, null, 2) +
-          "\n\nAdjust your tone and level of detail accordingly (e.g. more clinical/technical for role=clinician, plainer language for role=patient/caregiver; match response_style if provided).",
+          `
+
+Adjust tone and detail level to match, for EVERY response in this
+conversation (not just the first):
+- role=clinician: use clinical/technical terminology freely (e.g. exact
+  phase, mechanism of action, eligibility criteria wording), skip basic
+  explanations of medical terms.
+- role=patient or role=caregiver: plain, everyday language; briefly
+  explain any medical/technical term the first time it's used; warmer,
+  more reassuring tone.
+- response_style=concise (or similar short/brief value): short answers,
+  bullet points over paragraphs, no filler.
+- response_style=detailed (or similar thorough/in-depth value): fuller
+  explanations, more context and caveats, still well-organized.
+- If a field is absent, don't guess — fall back to a neutral,
+  moderately-detailed, plain-language default.`,
       });
     }
 
