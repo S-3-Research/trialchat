@@ -76,16 +76,16 @@ function ThreadListItem() {
           </span>
         )}
 
-        <ThreadListItemPrimitive.Delete asChild>
-          <Tooltip label="Delete conversation">
+        <Tooltip label="Delete conversation">
+          <ThreadListItemPrimitive.Delete asChild>
             <button
               aria-label="Delete conversation"
               className="shrink-0 opacity-0 group-hover:opacity-100 rounded-lg p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all disabled:pointer-events-none"
             >
               <Trash2 className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
-          </Tooltip>
-        </ThreadListItemPrimitive.Delete>
+          </ThreadListItemPrimitive.Delete>
+        </Tooltip>
       </div>
     </ThreadListItemPrimitive.Root>
   );
