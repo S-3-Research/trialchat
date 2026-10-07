@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "langgraphjs dev --port 2024",
+    "prebuild": "npm run check-shared-types",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "pretest": "npm run check-shared-types",
+    "test": "vitest run",
+    "sync-shared-types": "tsx scripts/sync-shared-types.ts",
+    "check-shared-types": "tsx scripts/sync-shared-types.ts --check"
   },
   "dependencies": {
-    "@acadia/shared-types": "*",
     "@langchain/core": "^1.2.11",
     "@langchain/langgraph": "^1.4.15",
     "@langchain/langgraph-checkpoint": "^1.1.5",
@@ -25,6 +28,7 @@
     "@langchain/langgraph-cli": "^1.4.6",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
+    "tsx": "^4.23.1",
     "typescript": "^5",
     "vitest": "^2.1.9"
   }

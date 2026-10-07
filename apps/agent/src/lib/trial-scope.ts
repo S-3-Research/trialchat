@@ -1,4 +1,4 @@
-import type { ThreadContextScope } from "@acadia/shared-types";
+import type { ThreadContextScope } from "../types/thread-context-scope.js";
 import type { AgentTool } from "../tools/registry.js";
 
 export function isFrozenScope(scope?: ThreadContextScope): scope is Exclude<ThreadContextScope, { type: "trial_search" }> {

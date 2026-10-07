@@ -1,5 +1,5 @@
 import { preserveTrialScope } from "./lib/trial-scope.js";
-import type { ThreadContextScope } from "@acadia/shared-types";
+import type { ThreadContextScope } from "./types/thread-context-scope.js";
 import { Annotation, MessagesAnnotation } from "@langchain/langgraph";
 import {
   uiMessageReducer,
