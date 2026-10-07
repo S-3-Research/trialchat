@@ -1,0 +1,48 @@
+name: Check shared-types sync
+
+# apps/agent is deployed as a standalone LangGraph build that only ever sees
+# the apps/agent directory (its langgraph.json has dependencies: ["."]), so
+# it can't depend on the @acadia/shared-types workspace package directly.
+# Instead it keeps a generated local copy at
+# apps/agent/src/types/thread-context-scope.ts, produced by
+# apps/agent/scripts/sync-shared-types.ts.
+#
+# This workflow is the enforcement point for that setup: if someone changes
+# packages/shared-types/src/index.ts and forgets to re-run
+# `npm run sync-shared-types --workspace=apps/agent` and commit the result,
+# this job fails and blocks the PR — since the LangGraph cloud build itself
+# only ever reads the committed snapshot and can't detect drift on its own.
+
+on:
+  pull_request:
+    branches:
+      - sbir-main
+      - sbir-simp
+    paths:
+      - "packages/shared-types/**"
+      - "apps/agent/**"
+      - ".github/workflows/check-shared-types.yml"
+  push:
+    branches:
+      - sbir-main
+      - sbir-simp
+    paths:
+      - "packages/shared-types/**"
+      - "apps/agent/**"
+      - ".github/workflows/check-shared-types.yml"
+
+jobs:
+  check-shared-types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify apps/agent/src/types/thread-context-scope.ts is in sync with packages/shared-types
+        run: npm run check-shared-types --workspace=apps/agent

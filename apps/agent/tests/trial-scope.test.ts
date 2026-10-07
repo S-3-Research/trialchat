@@ -3,7 +3,7 @@ import { MemorySaver, StateGraph, START, END } from "@langchain/langgraph";
 import { z } from "zod";
 import { AgentState } from "../src/state.js";
 import { preserveTrialScope, toolsForTrialScope } from "../src/lib/trial-scope.js";
-import type { ThreadContextScope } from "@acadia/shared-types";
+import type { ThreadContextScope } from "../src/types/thread-context-scope.js";
 
 const scope: ThreadContextScope = { type: "bookmark_full_snapshot", trialIds: ["NCT00000001", "NCT00000002"], capturedAt: "2026-09-21T00:00:00Z", trials: [{ id: "NCT00000001", title: "Trial One" }, { id: "NCT00000002", title: "Trial Two" }] };
 describe("fixed conversation scope", () => {

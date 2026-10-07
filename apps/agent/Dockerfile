@@ -3,15 +3,14 @@
 FROM node:20-slim AS base
 WORKDIR /repo
 
-# Install deps at the workspace root so npm workspaces can link
-# packages/shared-types correctly.
+# Install deps at the workspace root so npm workspaces resolve correctly.
+# (apps/agent has no remaining workspace-internal dependencies, but this
+# keeps parity with how it's installed via the root lockfile.)
 COPY package.json package-lock.json ./
 COPY apps/agent/package.json apps/agent/package.json
-COPY packages/shared-types/package.json packages/shared-types/package.json
-RUN npm ci --workspace=apps/agent --workspace=packages/shared-types --include-workspace-root
+RUN npm ci --workspace=apps/agent --include-workspace-root
 
 COPY apps/agent apps/agent
-COPY packages/shared-types packages/shared-types
 
 WORKDIR /repo/apps/agent
 
