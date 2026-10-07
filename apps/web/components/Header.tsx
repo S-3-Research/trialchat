@@ -1,59 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Home, FileText, UserCog, Settings } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useColorScheme } from "@/contexts/ColorSchemeContext";
 import { useFontSize } from "@/contexts/FontSizeContext";
 import { useVoiceInputMode } from "@/contexts/VoiceInputModeContext";
-import { INTAKE_STORAGE_KEY } from "@/lib/types/intake";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [showSignInNotice, setShowSignInNotice] = useState(false);
-  const [isClinicianMode, setIsClinicianMode] = useState(false);
   const { preference, setPreference } = useColorScheme();
   const { fontSize, setFontSize } = useFontSize();
   const { mode, setMode } = useVoiceInputMode();
-
-  // Detect clinician role from localStorage
-  useEffect(() => {
-    const checkClinicianRole = () => {
-      if (typeof window === "undefined") return;
-      const stored = localStorage.getItem(INTAKE_STORAGE_KEY);
-      if (stored) {
-        try {
-          const data = JSON.parse(stored);
-          setIsClinicianMode(data.role === "clinician");
-        } catch {
-          setIsClinicianMode(false);
-        }
-      } else {
-        setIsClinicianMode(false);
-      }
-    };
-
-    checkClinicianRole();
-
-    // Cross-tab storage changes
-    window.addEventListener("storage", checkClinicianRole);
-    // Same-tab: after intake completes or role changes
-    window.addEventListener("intake-role-updated", checkClinicianRole);
-
-    return () => {
-      window.removeEventListener("storage", checkClinicianRole);
-      window.removeEventListener("intake-role-updated", checkClinicianRole);
-    };
-  }, []);
-
-  const handleExitClinicianMode = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(INTAKE_STORAGE_KEY);
-    }
-    setIsClinicianMode(false);
-    window.dispatchEvent(new CustomEvent("clinician-mode-exited"));
-  };
 
   const toggleTheme = () => {
     setPreference(preference === "dark" ? "light" : "dark");
@@ -68,7 +29,7 @@ export default function Header() {
     <header className="flex-none px-0 py-4 flex items-center justify-between mx-auto max-w-7xl w-[95%] z-50 transition-all duration-300 ease-in-out">
       {/* Left: Logo Area */}
       <div className="flex items-center gap-3">
-        <Link href="/trial-chat" className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10 flex items-center justify-center bg-gradient-to-br from-slate-200 to-white dark:from-slate-700 dark:to-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-white/10 group-hover:scale-105 transition-transform duration-300">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-slate-700 dark:text-slate-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
@@ -86,7 +47,7 @@ export default function Header() {
         
         {/* Navigation Links */}
         <nav className="hidden md:flex items-center gap-1">
-            <Link href="/trial-chat" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
+            <Link href="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
                 {/* Outlined Home Icon */}
                 <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -94,15 +55,16 @@ export default function Header() {
                 Home
             </Link>
 
-            <Link href="/trial-chat/docs" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
-                {/* Outlined Document Icon */}
+            <Link href="/faq" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
+                {/* Outlined Question Mark Icon */}
                 <svg className="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 17.25h.007v.008H12v-.008z" />
                 </svg>
-                Docs
+                FAQ
             </Link>
 
-            <Link href="/trial-chat/bookmarks" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
+            <Link href="/bookmarks" className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/5 transition-all text-sm font-medium">
                 <Bookmark className="w-5 h-5" strokeWidth={1.5} />
                 Bookmarks
             </Link>
@@ -203,7 +165,7 @@ export default function Header() {
                       <div className="px-3 py-2.5 flex flex-col gap-2">
                           <DropdownMenu.Item asChild>
                             <Link
-                              href="/trial-chat/settings"
+                              href="/settings"
                               className="flex items-center gap-2 w-full px-2 py-2 text-xs font-medium text-slate-700 rounded-lg border border-slate-200 bg-slate-50/50 transition-colors hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:border-slate-600 cursor-pointer outline-none group"
                             >
                               <div className="p-1 rounded-md bg-white dark:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500 transition-colors">
@@ -220,7 +182,7 @@ export default function Header() {
 
                           <DropdownMenu.Item asChild>
                             <Link
-                              href="/trial-chat/personalization"
+                              href="/personalization"
                               className="flex items-center gap-2 w-full px-2 py-2 text-xs font-medium text-slate-700 rounded-lg border border-slate-200 bg-slate-50/50 transition-colors hover:bg-slate-100 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:border-slate-600 cursor-pointer outline-none group"
                             >
                               <div className="p-1 rounded-md bg-white dark:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-600 group-hover:border-slate-300 dark:group-hover:border-slate-500 transition-colors">
@@ -239,10 +201,6 @@ export default function Header() {
                 </DropdownMenu.Portal>
             </DropdownMenu.Root>
         </nav>
-        <Link href="/trial-chat/bookmarks" aria-label="Bookmarks" className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-white/5">
-          <Bookmark className="w-5 h-5" strokeWidth={1.5} />
-        </Link>
-
         {/* Divider */}
         <div className="mr-4 h-5 w-[1px] bg-slate-300 dark:bg-white/10 hidden md:block"></div>
 
@@ -257,37 +215,66 @@ export default function Header() {
              </DropdownMenu.Trigger>
              <DropdownMenu.Portal>
                 <DropdownMenu.Content className="z-[60] min-w-[200px] rounded-xl border py-2 shadow-xl border-slate-200 bg-white/95 backdrop-blur-xl dark:border-slate-700 dark:bg-slate-900/95" align="end">
-                  <DropdownMenu.Item asChild><Link href="/" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Home</Link></DropdownMenu.Item>
-                  <DropdownMenu.Item asChild><Link href="/trial-chat/personalization" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Personalization</Link></DropdownMenu.Item>
-                  <DropdownMenu.Item asChild><Link href="/trial-chat/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">Settings</Link></DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <Home className="w-4 h-4" strokeWidth={1.5} />
+                      Home
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/faq" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <FileText className="w-4 h-4" strokeWidth={1.5} />
+                      FAQ
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/bookmarks" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <Bookmark className="w-4 h-4" strokeWidth={1.5} />
+                      Bookmarks
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/personalization" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <UserCog className="w-4 h-4" strokeWidth={1.5} />
+                      Personalization
+                    </Link>
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Item asChild>
+                    <Link href="/settings" className="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">
+                      <Settings className="w-4 h-4" strokeWidth={1.5} />
+                      Settings
+                    </Link>
+                  </DropdownMenu.Item>
                 </DropdownMenu.Content>
              </DropdownMenu.Portal>
         </DropdownMenu.Root>
 
         {/* Theme Toggle Button (Quick access) */}
-        <button 
-            onClick={toggleTheme} 
-            className="w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200 hover:shadow-md hover:shadow-slate-200 dark:bg-white/5 dark:border-white/20 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:shadow-black/20" 
-            title="Toggle Dark Mode"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 hidden dark:block text-amber-300">
-                <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
-            </svg>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 block dark:hidden text-slate-600">
-                <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clipRule="evenodd" />
-            </svg>
-        </button>
+        <Tooltip label="Toggle dark mode">
+          <button 
+              onClick={toggleTheme} 
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200 hover:shadow-md hover:shadow-slate-200 dark:bg-white/5 dark:border-white/20 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:shadow-black/20" 
+          >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 hidden dark:block text-amber-300">
+                  <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
+              </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 block dark:hidden text-slate-600">
+                  <path fillRule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.7-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clipRule="evenodd" />
+              </svg>
+          </button>
+        </Tooltip>
         
         {/* Font Size Toggle (Quick access) */}
-        <button
-            onClick={() => setFontSize(fontSize === 'small' ? 'medium' : fontSize === 'medium' ? 'large' : 'small')}
-            className="w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200 hover:shadow-md hover:shadow-slate-200 dark:bg-white/5 dark:border-white/20 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:shadow-black/20"
-            title={`Font size: ${fontSize}`}
-        >
-            <span className="font-bold select-none leading-none text-[13px]">
-                {fontSize === 'small' ? 'A-' : fontSize === 'medium' ? 'A' : 'A+'}
-            </span>
-        </button>
+        <Tooltip label={`Font size: ${fontSize}`}>
+          <button
+              onClick={() => setFontSize(fontSize === 'small' ? 'medium' : fontSize === 'medium' ? 'large' : 'small')}
+              className="w-9 h-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200 hover:shadow-md hover:shadow-slate-200 dark:bg-white/5 dark:border-white/20 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:shadow-black/20"
+          >
+              <span className="font-bold select-none leading-none text-[13px]">
+                  {fontSize === 'small' ? 'A-' : fontSize === 'medium' ? 'A' : 'A+'}
+              </span>
+          </button>
+        </Tooltip>
 
         {/* Avatar */}
         <div className="relative">
@@ -313,27 +300,6 @@ export default function Header() {
         </div>
       </div>
     </header>
-
-    {/* Clinician Mode Banner */}
-    {isClinicianMode && (
-      <div className="flex-none w-full bg-emerald-600 dark:bg-emerald-700 text-white z-40">
-        <div className="mx-auto max-w-7xl w-[95%] flex items-center justify-between gap-3 py-2 px-1">
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <span className="text-sm font-semibold tracking-wide">Clinician Mode</span>
-            <span className="hidden sm:inline text-sm text-emerald-100">— viewing as a healthcare professional</span>
-          </div>
-          <button
-            onClick={handleExitClinicianMode}
-            className="flex items-center gap-1.5 text-xs font-medium text-emerald-100 hover:text-white transition-colors whitespace-nowrap underline underline-offset-2 decoration-emerald-300 hover:decoration-white"
-          >
-            Exit clinician mode
-          </button>
-        </div>
-      </div>
-    )}
     </>
   );
 }
