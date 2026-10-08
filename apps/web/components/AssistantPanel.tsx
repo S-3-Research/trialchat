@@ -63,6 +63,48 @@ import {
 const CHAT_PANEL_WIDTH_PERCENT = 36;
 const CHAT_PANEL_MOBILE_WIDTH = "min(92%, 30rem)";
 
+/**
+ * Shared visual shell for the two independent cards that make up the
+ * desktop "dual" layout — Trial Panel and Chat. Previously this styling
+ * (rounded corners, border, background, shadow) lived on a single outer
+ * wrapper around both columns (see the bottom of AssistantPanelBody's
+ * render); now each column owns it directly so they read as two distinct
+ * cards with a gap between them, rather than one card split by a border.
+ * Mobile keeps a slightly larger radius (only ever one card visible
+ * there) to match the old single-card look.
+ */
+const PANEL_CARD_CLASS =
+  "rounded-[32px] md:rounded-[28px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)]";
+
+/**
+ * === Apple-carousel-style dual/fullscreen transition — TUNING KNOBS ===
+ * Switching between "dual" and either fullscreen mode no longer animates
+ * width down to 0 on the disappearing card (that caused its box-shadow to
+ * bunch up into a solid vertical bar as the card got squeezed — see the
+ * card-splitting change above). Instead the disappearing card slides
+ * fully out of the row via `transform: translateX()` + fades via
+ * `opacity`, while the *other* (remaining/growing) card's `width`
+ * transition kicks in slightly after — that stagger is what reads as a
+ * deliberate, Apple-carousel-like overlap instead of two edges moving in
+ * perfect, slightly robotic lockstep. See the Trial/Chat card blocks
+ * below (search for PANEL_EXPAND_DELAY_MS) for where these are applied.
+ *
+ * - PANEL_TRANSITION_MS: duration of both the slide/fade and the width
+ *   animation. Keep the two equal so they finish together despite the
+ *   stagger below.
+ * - PANEL_TRANSITION_EASE: shared easing curve for both.
+ * - PANEL_EXPAND_DELAY_MS: how long the growing/shrinking card's WIDTH
+ *   transition waits before starting, relative to the other card's
+ *   slide/fade (which always starts at 0 delay). Bigger = more
+ *   pronounced "the other card is already moving before this one
+ *   reacts" overlap; 0 = both move in lockstep (no carousel feel); too
+ *   large (beyond ~half of PANEL_TRANSITION_MS) starts to look like two
+ *   separate, disconnected animations rather than one choreographed move.
+ */
+const PANEL_TRANSITION_MS = 620;
+const PANEL_TRANSITION_EASE = "cubic-bezier(0.32,0.72,0,1)";
+const PANEL_EXPAND_DELAY_MS = 120;
+
 
 /**
  * LangGraph-backed chat panel with personalized starter prompts and a
@@ -233,7 +275,7 @@ export function AssistantPanel() {
   });
 
   return (
-    <div className="relative flex flex-1 w-full h-full mx-auto max-w-7xl rounded-[32px] overflow-hidden border border-slate-200/70 dark:border-slate-700/60 bg-white dark:bg-[#181D26] shadow-[0_30px_70px_-24px_rgba(30,41,59,0.25)] dark:shadow-[0_30px_70px_-24px_rgba(0,0,0,0.6)] transition-colors">
+    <div className="relative flex flex-1 w-full h-full mx-auto max-w-7xl transition-colors">
       <AssistantRuntimeProvider runtime={runtime}>
         <ThreadNavigation enabled={showIntakeModal !== null} />
         {showIntakeModal && (
@@ -412,6 +454,75 @@ function AssistantPanelBody({
   const isTrialFullscreen = !lockDual && layoutMode === "trial-full";
   const isChatFullscreen = !lockDual && layoutMode === "chat-full";
 
+  // Tracks the layoutMode from just before the current one, read DURING
+  // render (the ref update in the effect below only lands after this
+  // render commits) so the choreography math right after a layoutMode
+  // change can still see "where we came from". Used to decide, per card,
+  // whether IT is the one sliding off/onto screen for the transition
+  // currently in flight — see trialSlidesThisTransition/
+  // chatSlidesThisTransition below, and the width-transition-delay
+  // comment where they're consumed. Without this, a card that's
+  // sliding in while *also* needing to change width (e.g. Chat
+  // reappearing from "trial-full" back into "dual", where it both
+  // slides in AND shrinks from 100% back to its docked width) would
+  // have its width change arrive on the same staggered delay as the
+  // *other*, merely-resizing card — making the sliding-in card visibly
+  // arrive at its old (wrong) width first, then resize afterwards
+  // ("widens then narrows"). Synchronizing its width change with its
+  // own slide (zero delay) instead fixes that.
+  const prevLayoutModeRef = useRef(layoutMode);
+  useEffect(() => {
+    prevLayoutModeRef.current = layoutMode;
+  }, [layoutMode]);
+  const prevLayoutMode = prevLayoutModeRef.current;
+  // Each card's width/transform/opacity transitions all share a single
+  // per-transition delay, chosen so that whichever card is RECEDING
+  // (sliding away to hide, or shrinking while staying visible) always
+  // moves first at 0 delay, while whichever card is ARRIVING (sliding in
+  // to reveal, or expanding while staying visible) waits
+  // PANEL_EXPAND_DELAY_MS so it only starts once the receding card has
+  // had a head start — "make room, then fill it", in BOTH directions.
+  //
+  // This used to be judged purely by "is this card the one that slides
+  // for this transition" (always 0 delay) vs. "merely resizes" (always
+  // delayed) — which happened to work for ENTERING a fullscreen mode
+  // (dual → trial-full: Chat recedes/slides at 0, Trial arrives/expands
+  // delayed — correct) but was backwards for RETURNING to dual
+  // (trial-full → dual: Trial should recede/shrink FIRST at 0 delay so
+  // Chat has room, then Chat arrives/slides in delayed — the old logic
+  // instead gave Chat's slide-in 0 delay and Trial's shrink the delay,
+  // so Chat visibly started arriving before Trial had even begun
+  // shrinking). The booleans below instead key off which specific
+  // fullscreen axis (trial-full vs. chat-full) is being entered/left,
+  // independent of which card happens to be doing the sliding vs. the
+  // resizing.
+  const goingToTrialFull = layoutMode === "trial-full";
+  const leavingTrialFull = prevLayoutMode === "trial-full"; // implies layoutMode is now "dual"
+  const goingToChatFull = layoutMode === "chat-full";
+  const leavingChatFull = prevLayoutMode === "chat-full"; // implies layoutMode is now "dual"
+  // Trial Panel hides/shows (slides) on the chat-full axis, and
+  // expands/shrinks (resizes, staying visible) on the trial-full axis.
+  const trialDelay = goingToChatFull
+    ? 0 // Trial is receding (hiding) — move first
+    : leavingChatFull
+    ? PANEL_EXPAND_DELAY_MS // Trial is arriving (showing) — wait for Chat to shrink first
+    : goingToTrialFull
+    ? PANEL_EXPAND_DELAY_MS // Trial is arriving (expanding) — wait for Chat to recede first
+    : leavingTrialFull
+    ? 0 // Trial is receding (shrinking) — move first
+    : PANEL_EXPAND_DELAY_MS; // steady state; never visually observed
+  // Chat is the mirror image: hides/shows (slides) on the trial-full
+  // axis, expands/shrinks (resizes, staying visible) on the chat-full axis.
+  const chatDelay = goingToTrialFull
+    ? 0 // Chat is receding (hiding) — move first
+    : leavingTrialFull
+    ? PANEL_EXPAND_DELAY_MS // Chat is arriving (showing) — wait for Trial to shrink first
+    : goingToChatFull
+    ? PANEL_EXPAND_DELAY_MS // Chat is arriving (expanding) — wait for Trial to recede first
+    : leavingChatFull
+    ? 0 // Chat is receding (shrinking) — move first
+    : PANEL_EXPAND_DELAY_MS; // steady state; never visually observed
+
   // Search History is a left-anchored drawer, independent of layoutMode:
   // in "dual" it's an inline column that pushes Chat into an icon rail
   // (Trial Panel keeps its width); in either fullscreen mode there's only
@@ -560,182 +671,248 @@ function AssistantPanelBody({
          * fullscreen toggle is rendered by TrialPanelShell itself via
          * `onToggleFullscreen`/`isFullscreen`.
          */}
-      <div className="relative flex flex-1 min-w-0">
-        {/* Search History — left-anchored drawer, independent of
-         * layoutMode. In "dual" it's an inline column (pushes Chat into
-         * an icon rail, see the Chat column below) that animates its
-         * width open/closed exactly like the Chat column's own width
-         * transitions below, rather than mounting/unmounting abruptly;
-         * its inner content keeps a fixed w-64 so it doesn't reflow
-         * mid-transition. Squeeze vs. overlay depends on layoutMode: in
-         * "dual" there are already two panels sharing the row, so History
-         * floats as a scrim+overlay instead of squeezing either one (see
-         * the overlay block further below); in either fullscreen mode
-         * there's only a single panel, so History can simply squeeze it
-         * inline here without needing a separate icon-rail affordance.
-         * Mobile renders its own overlay sheet instead (further below). */}
+      <div className="relative flex-1 min-w-0 h-full">
         {(() => {
-          const historyInline = !isMobile && historyOpen && layoutMode !== "dual";
-          return (
-            <div
-              className={`hidden md:flex md:flex-col overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-                historyInline ? "border-r border-slate-200/70 dark:border-slate-700/60" : ""
-              }`}
-              style={{ width: historyInline ? "16rem" : "0" }}
-            >
-              <SearchHistoryPanelContent onClose={() => setHistoryOpen(false)} />
-            </div>
-          );
-        })()}
-
-        {(() => {
-          // Mirrors the Chat column's explicit-percentage-width approach
-          // (instead of conditionally mounting/unmounting) so toggling
-          // Trial Panel fullscreen animates smoothly instead of snapping.
-          // Mobile always gets the full width — Chat is an overlay sheet
-          // there, never an inline sibling, so there's nothing to share
-          // space with.
-          const trialWidthPercent = isMobile
-            ? 100
-            : layoutMode === "chat-full"
-            ? 0
-            : layoutMode === "trial-full"
-            ? 100
-            : 100 - CHAT_PANEL_WIDTH_PERCENT;
-          // When History squeezes in inline (fullscreen modes only — see
-          // the block above), it claims a fixed 16rem out of the row, so
-          // the single "full" panel must shrink by that same amount via
-          // calc() instead of staying a flat 100% — otherwise the row's
-          // total width exceeds its container and History gets clipped by
-          // the outer rounded-[32px] wrapper's overflow-hidden.
-          const historyInline = !isMobile && historyOpen && layoutMode !== "dual";
+          // Trial Panel card. Positioned absolutely (rather than a flex
+          // child) so its width and its visibility-driven slide/fade can
+          // animate independently of the Chat card — see the
+          // PANEL_TRANSITION_* constants above for the choreography.
+          // Mobile always gets the full width/left:0 — Chat is an
+          // overlay sheet there (further below), never an inline
+          // sibling, so there's nothing to share space or stagger with.
+          const trialHidden = !isMobile && !showTrial; // only in "chat-full"
+          const trialWidthPercent = isMobile || layoutMode !== "dual" ? 100 : 100 - CHAT_PANEL_WIDTH_PERCENT;
           const trialWidth = isMobile
             ? "100%"
-            : historyInline && trialWidthPercent === 100
-            ? "calc(100% - 16rem)"
-            : `${trialWidthPercent}%`;
+            : layoutMode === "dual"
+            ? `calc(${trialWidthPercent}% - 0.5rem)`
+            : "100%";
+          // Search History still squeezes in from the LEFT of the Trial
+          // Panel card specifically when this card is the sole fullscreen
+          // surface ("trial-full") — it lives inside this card's own flex
+          // row (rather than a row-level column), so the card's own width
+          // stays a clean percentage; the squeeze is purely an internal
+          // flex split and never affects the outer row's positioning.
+          const historySqueeze = !isMobile && historyOpen && layoutMode === "trial-full";
           return (
+            // Outer slide layer: always spans the row's FULL width (not
+            // the card's own, narrower target width), so its
+            // `translateX(±100%)` is resolved against that same full
+            // width — i.e. exactly the row's own edge-to-edge span —
+            // which is what makes the card visibly keep sliding for the
+            // ENTIRE transition duration instead of disappearing early
+            // (see the ancestor page's own overflow-hidden, several
+            // levels up, for where the slide actually gets clipped —
+            // intentionally NOT this row, so the card travels all the
+            // way to the real viewport/page edge instead of stopping at
+            // this row's own narrow bounds).
+            //
+            // This outer wrapper is ALWAYS `pointer-events: none` — even
+            // while fully visible — because it spans the row's full
+            // width (so its translateX basis lines up with the slide
+            // distance), which is wider than the actual visible card
+            // sitting inside it. Without this, the empty portion of its
+            // bounding box (the part NOT covered by the inner card, e.g.
+            // the space to the right of a narrower Trial card in "dual")
+            // would silently swallow clicks meant for whatever sits
+            // beneath/beside it — which is exactly what broke the Trial
+            // Panel's own fullscreen button: Chat's full-width outer
+            // wrapper (z-10, rendered after Trial in DOM order) was
+            // pointer-events:auto across the ENTIRE row whenever Chat
+            // was visible (i.e. in "dual"), including over the Trial
+            // card's left-hand header where that button lives. Real
+            // hit-testing is delegated entirely to the inner card below,
+            // which is sized to its own actual visible bounds.
             <div
-              className="relative min-w-0 flex flex-col overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
-              style={{ width: trialWidth }}
+              className="absolute inset-y-0 left-0 w-full pointer-events-none"
+              aria-hidden={trialHidden}
+              style={{
+                zIndex: 0,
+                transform: trialHidden ? "translateX(-100%)" : "translateX(0)",
+                opacity: trialHidden ? 0 : 1,
+                transition: [
+                  `transform ${PANEL_TRANSITION_MS}ms ${PANEL_TRANSITION_EASE} ${trialDelay}ms`,
+                  `opacity ${PANEL_TRANSITION_MS}ms ${PANEL_TRANSITION_EASE} ${trialDelay}ms`,
+                ].join(", "),
+              }}
             >
-            {!scope ? (
-              <TrialPanel
-                onAsk={openChatForRun}
-                isFullscreen={!isMobile && isTrialFullscreen}
-                onToggleFullscreen={
-                  isMobile || lockDual ? undefined : () => setLayoutMode(isTrialFullscreen ? "dual" : "trial-full")
-                }
-                headerActions={
-                  <TrialPanelHeaderIcons
-                    isMobile={isMobile}
-                    historyOpen={isMobile ? mobileSheet === "history" : historyOpen}
-                    onToggleHistory={() =>
-                      isMobile
-                        ? setMobileSheet((v) => (v === "history" ? null : "history"))
-                        : setHistoryOpen((v) => !v)
-                    }
-                    chatOpen={mobileSheet === "chat"}
-                    onToggleChat={() => setMobileSheet((v) => (v === "chat" ? null : "chat"))}
-                  />
-                }
-              />
-            ) : (
-              panel
-            )}
-            {!loading && !hydrationError && scope && !trialPanelOpen && (
-              <div className="absolute top-4 right-4 z-20">
-                <Tooltip label="View this conversation's trials">
-                  <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-10 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
-                    <PanelRight className="h-4 w-4" />
-                    Trials {scope.trialIds.length}
-                  </button>
-                </Tooltip>
+              <div
+                className={`${PANEL_CARD_CLASS} absolute inset-y-0 left-0 flex flex-col`}
+                style={{
+                  width: trialWidth,
+                  pointerEvents: trialHidden ? "none" : "auto",
+                  transition: `width ${PANEL_TRANSITION_MS}ms ${PANEL_TRANSITION_EASE} ${trialDelay}ms`,
+                }}
+              >
+              <div className="relative flex flex-1 min-h-0">
+                <div
+                  className={`hidden md:flex md:flex-col shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                    historySqueeze ? "border-r border-slate-200/70 dark:border-slate-700/60" : ""
+                  }`}
+                  style={{ width: historySqueeze ? "16rem" : "0" }}
+                >
+                  <SearchHistoryPanelContent onClose={() => setHistoryOpen(false)} />
+                </div>
+                <div className="relative flex-1 min-w-0 flex flex-col">
+                  {!scope ? (
+                    <TrialPanel
+                      onAsk={openChatForRun}
+                      isFullscreen={!isMobile && isTrialFullscreen}
+                      onToggleFullscreen={
+                        isMobile || lockDual ? undefined : () => setLayoutMode(isTrialFullscreen ? "dual" : "trial-full")
+                      }
+                      headerActions={
+                        <TrialPanelHeaderIcons
+                          isMobile={isMobile}
+                          historyOpen={isMobile ? mobileSheet === "history" : historyOpen}
+                          onToggleHistory={() =>
+                            isMobile
+                              ? setMobileSheet((v) => (v === "history" ? null : "history"))
+                              : setHistoryOpen((v) => !v)
+                          }
+                          chatOpen={mobileSheet === "chat"}
+                          onToggleChat={() => setMobileSheet((v) => (v === "chat" ? null : "chat"))}
+                        />
+                      }
+                    />
+                  ) : (
+                    panel
+                  )}
+                  {!loading && !hydrationError && scope && !trialPanelOpen && (
+                    <div className="absolute top-4 right-4 z-20">
+                      <Tooltip label="View this conversation's trials">
+                        <button onClick={openPanel} aria-label="Open conversation trials" className="flex items-center gap-2 h-10 px-4 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-600 dark:text-slate-300">
+                          <PanelRight className="h-4 w-4" />
+                          Trials {scope.trialIds.length}
+                        </button>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+              </div>
             </div>
           );
         })()}
 
-        {/*
-         * Chat column. In "dual" it's a percentage-width docked column
-         * (no longer shrinks to an icon rail when History opens — History
-         * is an overlay in "dual", see below, so Chat always keeps its
-         * normal width); in "chat-full" it takes the entire surface;
-         * width animates to 0 (instead of unmounting) in "trial-full".
-         * New Search / Search History controls only appear in its header
-         * once Chat IS the main panel (chat-full) — while merely docked
-         * in "dual", History is already reachable from the Trial Panel's
-         * own header (shared `historyOpen` state), so repeating it here
-         * would be redundant. The fullscreen toggle itself is always
-         * rendered (even for bookmark-snapshot threads) but disabled when
-         * `lockDual`, for the same header-consistency reason as the
-         * Trial Panel's own (disabled) fullscreen button — see
-         * BookmarkSnapshotPanel.
-         */}
-        <div
-          className={`hidden md:flex md:flex-col overflow-hidden border-slate-200/70 dark:border-slate-700/60 transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
-            showChat ? "border-l" : ""
-          } ${layoutMode === "dual" ? "md:shrink-0" : ""}`}
-          style={{
-            width: !showChat
-              ? "0%"
-              : layoutMode === "dual"
-              ? `${CHAT_PANEL_WIDTH_PERCENT}%`
-              : !isMobile && historyOpen
-              ? "calc(100% - 16rem)"
-              : "100%",
-          }}
-        >
-              <div className="relative flex flex-1 min-h-0 flex-col">
-                <div className={`flex items-center justify-between mb-2 shrink-0 pt-4 ${PANEL_PADDING_X}`}>
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    Chat
-                  </span>
-                  <div className="flex items-center gap-1">
-                    {isChatFullscreen && (
-                      <TrialPanelHeaderIcons
-                        isMobile={false}
-                        historyOpen={historyOpen}
-                        onToggleHistory={() => setHistoryOpen((v) => !v)}
-                      />
-                    )}
-                    <Tooltip label={lockDual ? "Fullscreen unavailable for bookmarked trials" : isChatFullscreen ? "Exit fullscreen" : "Fullscreen chat"}>
-                      <button
-                        onClick={lockDual ? undefined : () => setLayoutMode(isChatFullscreen ? "dual" : "chat-full")}
-                        disabled={lockDual}
-                        aria-label={isChatFullscreen ? "Exit fullscreen" : "Fullscreen chat"}
-                        className={`p-1.5 rounded-lg ${lockDual ? "text-slate-300 dark:text-slate-600 cursor-not-allowed" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
-                      >
-                        {isChatFullscreen ? <Minimize2 className="w-4 h-4" strokeWidth={2} /> : <Maximize2 className="w-4 h-4" strokeWidth={2} />}
-                      </button>
-                    </Tooltip>
-                  </div>
+        {(() => {
+          // Chat card. Mirrors the Trial card above (absolute, independent
+          // width + slide/fade animation). Always mounted regardless of
+          // layoutMode — even while fully slid-out and faded in
+          // "trial-full" — so ChatSurface's internal state (scroll
+          // position, in-flight stream, composer draft) never resets;
+          // only its visibility is toggled via transform/opacity/
+          // pointer-events, never via unmounting.
+          // New Search / Search History controls only appear in its header
+          // once Chat IS the main panel (chat-full) — while merely docked
+          // in "dual", History is already reachable from the Trial Panel's
+          // own header (shared `historyOpen` state), so repeating it here
+          // would be redundant. The fullscreen toggle itself is always
+          // rendered (even for bookmark-snapshot threads) but disabled when
+          // `lockDual`, for the same header-consistency reason as the
+          // Trial Panel's own (disabled) fullscreen button — see
+          // BookmarkSnapshotPanel.
+          const chatHidden = isMobile || !showChat; // mobile: always the sheet below, never this inline card
+          const chatWidthPercent = layoutMode !== "dual" ? 100 : CHAT_PANEL_WIDTH_PERCENT;
+          const chatWidth = layoutMode === "dual" ? `calc(${chatWidthPercent}% - 0.5rem)` : "100%";
+          // Search History squeezes in from the left of the Chat card
+          // specifically when Chat is the sole fullscreen surface
+          // ("chat-full") — same internal-flex-row approach as the Trial
+          // Panel card above, instead of a row-level column.
+          const historySqueeze = !isMobile && historyOpen && layoutMode === "chat-full";
+          return (
+            // Mirrors the Trial card's outer-slide-layer/inner-anchored-
+            // card split above (full-width outer layer for a correct
+            // slide distance, always pointer-events:none; the inner,
+            // actually-visible card owns real pointer-events and width) —
+            // see that comment for the full rationale, including why
+            // this fixes a real click-blocking bug when this card used
+            // to be pointer-events:auto across its own full-width
+            // wrapper.
+            <div
+              className="hidden md:absolute md:inset-y-0 md:right-0 md:w-full md:flex md:flex-col pointer-events-none"
+              aria-hidden={chatHidden}
+              style={{
+                zIndex: 10,
+                transform: chatHidden ? "translateX(100%)" : "translateX(0)",
+                opacity: chatHidden ? 0 : 1,
+                transition: [
+                  `transform ${PANEL_TRANSITION_MS}ms ${PANEL_TRANSITION_EASE} ${chatDelay}ms`,
+                  `opacity ${PANEL_TRANSITION_MS}ms ${PANEL_TRANSITION_EASE} ${chatDelay}ms`,
+                ].join(", "),
+              }}
+            >
+              <div
+                className={`${PANEL_CARD_CLASS} absolute inset-y-0 right-0 flex flex-col`}
+                style={{
+                  width: chatWidth,
+                  pointerEvents: chatHidden ? "none" : "auto",
+                  transition: `width ${PANEL_TRANSITION_MS}ms ${PANEL_TRANSITION_EASE} ${chatDelay}ms`,
+                }}
+              >
+              <div className="relative flex flex-1 min-h-0">
+                <div
+                  className={`hidden md:flex md:flex-col shrink-0 overflow-hidden transition-[width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                    historySqueeze ? "border-r border-slate-200/70 dark:border-slate-700/60" : ""
+                  }`}
+                  style={{ width: historySqueeze ? "16rem" : "0" }}
+                >
+                  <SearchHistoryPanelContent onClose={() => setHistoryOpen(false)} />
                 </div>
-                {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} />}
-                {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
-                  isScoped={!!scope}
-                  placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
-                  greeting={scope ? (scope.trialIds.length === 1 ? "Discuss this trial" : `Discuss these ${scope.trialIds.length} trials`) : greeting}
-                  prompts={scope ? [] : prompts}
-                  intakeData={intakeData}
-                />}
+                <div className="relative flex flex-1 min-h-0 flex-col">
+                  <div className={`flex items-center justify-between mb-2 shrink-0 pt-4 ${PANEL_PADDING_X}`}>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      Chat
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {isChatFullscreen && (
+                        <TrialPanelHeaderIcons
+                          isMobile={false}
+                          historyOpen={historyOpen}
+                          onToggleHistory={() => setHistoryOpen((v) => !v)}
+                        />
+                      )}
+                      <Tooltip label={lockDual ? "Fullscreen unavailable for bookmarked trials" : isChatFullscreen ? "Exit fullscreen" : "Fullscreen chat"}>
+                        <button
+                          onClick={lockDual ? undefined : () => setLayoutMode(isChatFullscreen ? "dual" : "chat-full")}
+                          disabled={lockDual}
+                          aria-label={isChatFullscreen ? "Exit fullscreen" : "Fullscreen chat"}
+                          className={`p-1.5 rounded-lg ${lockDual ? "text-slate-300 dark:text-slate-600 cursor-not-allowed" : "text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"}`}
+                        >
+                          {isChatFullscreen ? <Minimize2 className="w-4 h-4" strokeWidth={2} /> : <Maximize2 className="w-4 h-4" strokeWidth={2} />}
+                        </button>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  {scope && <ThreadScopeHeader key={activeThreadKey} scope={scope} onViewTrials={openPanel} />}
+                  {loading ? <p role="status" className="m-auto text-sm text-slate-500">Loading conversation…</p> : hydrationError ? <div role="alert" className="m-auto p-6 text-sm text-red-600">{hydrationError}<button className="ml-2 underline" onClick={() => window.location.reload()}>Reload</button></div> : <ChatSurface
+                    isScoped={!!scope}
+                    placeholder={scope ? "Ask about these trials…" : PLACEHOLDER_INPUT}
+                    greeting={scope ? (scope.trialIds.length === 1 ? "Discuss this trial" : `Discuss these ${scope.trialIds.length} trials`) : greeting}
+                    prompts={scope ? [] : prompts}
+                    intakeData={intakeData}
+                  />}
+                </div>
               </div>
-        </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Search History as a scrim+overlay — "dual" already has two
-         * panels sharing the row, so History floats above them instead of
-         * squeezing either one (squeeze is reserved for the fullscreen
-         * cases above, where there's only a single panel to share space
-         * with). Always mounted (never conditionally rendered) while in
-         * "dual" so open/close can transition smoothly — same convention
-         * as the inline-squeeze History column and the Chat/Trial Panel
-         * width transitions above — instead of popping in/out instantly.
+         * cards sharing the row, so History floats above them, anchored
+         * to the left edge of the Trial Panel card, instead of squeezing
+         * either one (squeeze is reserved for the fullscreen cases above,
+         * where there's only a single card to share space with). Always
+         * mounted (never conditionally rendered) while in "dual" so
+         * open/close can transition smoothly — same convention as the
+         * inline-squeeze History column and the Chat/Trial Panel width
+         * transitions above — instead of popping in/out instantly.
          * Clicking the scrim (or anywhere outside the drawer, since the
          * scrim covers the rest of this row) closes it. */}
         {!isMobile && layoutMode === "dual" && (
           <div
-            className={`absolute inset-0 z-30 flex transition-opacity duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+            className={`absolute inset-0 z-30 flex rounded-[32px] md:rounded-[28px] overflow-hidden transition-opacity duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
               historyOpen ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
